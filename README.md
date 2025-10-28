@@ -83,11 +83,12 @@ Both flows are fully automated by `build_in_toolchain.sh` and `deploy_to_sd.sh` 
 ### A — Build with `shauninman/union-miyoomini-toolchain` (Docker)
 
 1. **Clone the toolchain repo (host):**
+
    ```bash
    cd ~
    git clone https://github.com/shauninman/union-miyoomini-toolchain.git
    cd union-miyoomini-toolchain
-````
+   ````
 
 2. **Prepare workspace and place `sliderUI` into it:**
 
