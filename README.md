@@ -101,15 +101,53 @@ Both flows are fully automated by `build_in_toolchain.sh` and `deploy_to_sd.sh` 
    # cd workspace && git clone <your-sliderUI-repo> sliderUI
    ```
 
-3. **Build using helper script** (or run docker manually):
+3. Install / Open **Docker Desktop** (Windows)
+
+- If you already have it installed → open it.
+- Otherwise download: [https://www.docker.com/products/docker-desktop/](https://www.docker.com/products/docker-desktop/)
+
+- Enable **WSL Integration**
+  - Open **Docker Desktop → Settings → Resources → WSL Integration**
+  - Check:
+  ``` 
+  ☑ Enable integration with my default WSL distro
+  ☑ Ubuntu / Debian (whichever your WSL uses)
+  ```
+  - Click **Apply & Restart**
+
+- Confirm Docker is visible inside WSL
+  - In your WSL shell: 
+  ```bash
+  docker --version
+  ```
+
+4. Run the toolchain image locally (one time)
+
+  - from the MinUI toolchain folder:
+  ```bash
+  cd ./
+  docker build -t union-miyoomini-toolchain .
+  ```
+  - When finished, check:
+  ```bash
+  docker images | grep union
+  ```
+
+  - Expected output example:
+  ```
+  union-miyoomini-toolchain   latest   <some-id>   <size>
+  ```
+
+5. **Build SliderUI using the helper script** (or run docker manually):
 
    * From the `union-miyoomini-toolchain` repo root:
-
-     ```bash
-     ./build_in_toolchain.sh
-     ```
-
-     (By default it uses the repo's Dockerfile if present, otherwise pulls `shauninman/union-miyoomini-toolchain`.)
+  
+   ```bash
+   cd ./workspace/sliderUI
+   chmod +x build_in_toolchain.sh
+   ./build_in_toolchain.sh
+   ```
+   (By default it uses the repo's Dockerfile if present, otherwise pulls `shauninman/union-miyoomini-toolchain`.)
 
    * Equivalent manual docker command (example):
 
@@ -117,7 +155,7 @@ Both flows are fully automated by `build_in_toolchain.sh` and `deploy_to_sd.sh` 
      docker run --rm -v "$(pwd)/workspace":/root/workspace -w /root/workspace/sliderUI shauninman/union-miyoomini-toolchain:latest /bin/bash -lc "make clean; make -j\$(nproc) all"
      ```
 
-4. **Check artifacts on host:**
+6. **Check artifacts on host:**
    The built artifacts are on host under:
 
    ```
@@ -130,7 +168,7 @@ Both flows are fully automated by `build_in_toolchain.sh` and `deploy_to_sd.sh` 
    * `build/sliderUI_installer`
    * `build/*.sha256`
 
-5. **Bundle runtime libraries (optional but recommended)**
+7. **Bundle runtime libraries (optional but recommended)**
    Inside the same Docker shell or on host (after build), from project root:
 
    ```bash
