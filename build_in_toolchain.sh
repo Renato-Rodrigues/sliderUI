@@ -1,37 +1,44 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SLIDERUI_SRC=${1:-.}
-TOOLCHAIN_REPO_DIR=$(pwd)
-WORKSPACE_DIR="$TOOLCHAIN_REPO_DIR/workspace"
+# Get the absolute path to the project directory (where this script is)
+PROJECT_ROOT=$(pwd)
 
-# If user passed a directory, refresh code inside workspace
-if [ -n "$SLIDERUI_SRC" ]; then
-  echo "[build] Copying sliderUI source from $SLIDERUI_SRC into workspace..."
-  rm -rf "$WORKSPACE_DIR/sliderUI"
-  mkdir -p "$WORKSPACE_DIR"
-  cp -r "$SLIDERUI_SRC" "$WORKSPACE_DIR/sliderUI"
-fi
+# --- No more copying ---
+# The old logic of copying source into a 'workspace' subdirectory was
+# causing recursive copy errors and permission issues.
+# Instead, we will mount the entire project directory directly.
 
 # ✅ Always use the LOCAL toolchain image
 IMAGE_NAME="union-miyoomini-toolchain:latest"
 
 echo "[build] Using local toolchain image: $IMAGE_NAME"
+echo "[build] Mounting project directory: $PROJECT_ROOT"
+
+# --- One-time cleanup ---
+# If you are getting "Permission denied" errors from a previous build,
+# you must run 'sudo rm -rf workspace/' ONCE from this directory
+# to remove the old root-owned files. This script will no longer use
+# or create that 'workspace' directory.
 
 echo "[build] Running container to build sliderUI and installer..."
+
+# We construct the entire build command as a single line string to avoid
+# multi-line parsing issues by the host shell.
+# We explicitly call 'pwd' and 'nproc' inside the container via escaped $()
+BUILD_COMMAND="set -e; echo '[container] In directory: \$(pwd) (Expected: /app)'; echo '[container] Running make clean...'; make clean || true; echo '[container] Running make all...'; make -j\$(nproc) all"
+
+# Run the container:
+# - Mount the current project directory (PROJECT_ROOT) to /app inside the container
+# - Set the working directory inside the container to /app
+# - Run as the host user ("$(id -u):$(id -g)") to avoid file permission problems
 docker run --rm \
   -u "$(id -u):$(id -g)" \
-  -v "$WORKSPACE_DIR":/root/workspace \
-  -w /root/workspace/sliderUI \
+  -v "$PROJECT_ROOT":/app \
+  -w /app \
   "$IMAGE_NAME" \
-  /bin/bash -lc "\
-set -e; \
-echo '[container] pwd:' \$(pwd); \
-source /root/.bashrc || true; \
-make clean || true; \
-make -j\$(nproc) all \
-"
+  /bin/bash -c "$BUILD_COMMAND"
 
-echo "[build] Build finished. Artifacts in: $WORKSPACE_DIR/sliderUI/build"
-ls -l "$WORKSPACE_DIR/sliderUI/build"
-cat "$WORKSPACE_DIR/sliderUI/build/"*.sha256 || true
+echo "[build] Build finished. Artifacts in: $PROJECT_ROOT/build"
+ls -l "$PROJECT_ROOT/build"
+cat "$PROJECT_ROOT/build/"*.sha256 || true

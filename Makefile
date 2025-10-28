@@ -12,7 +12,7 @@
 
 # Compiler selection (toolchain container sets appropriate PATH so `g++` resolves to cross-compiler)
 CXX ?= $(shell which g++ 2>/dev/null || echo g++)
-CXXFLAGS = -O2 -Wall -std=c++17 -I/usr/include/SDL2 -D_REENTRANT
+CXXFLAGS = -O2 -Wall -std=c++17 -D_REENTRANT -I/usr/include/SDL2 -I$(SYSROOT)/usr/include/SDL2
 LDFLAGS = -lSDL2 -lSDL2_image -lSDL2_ttf
 
 SRCDIR = src
@@ -65,9 +65,8 @@ clean:
 # bundle - copy target ELF's NEEDED .so from toolchain sysroot to deploy/lib/
 bundle: $(APP)
 	@echo "===> Preparing deploy directory..."
-	mkdir -p $(LIB_DIR)
+	@mkdir -p $(LIB_DIR)
 	@echo "===> Locating required shared libraries listed by readelf..."
-	@# readelf may live in toolchain bin folder; try fallback to readelf in PATH
 	@READELF=""; \
 	if [ -x "$(TOOLCHAIN)/bin/readelf" ]; then \
 		READELF="$(TOOLCHAIN)/bin/readelf"; \
@@ -99,62 +98,62 @@ bundle: $(APP)
 
 # create run wrapper to set LD_LIBRARY_PATH
 install-wrapper:
-	mkdir -p $(DEPLOYDIR)
-	cat > $(DEPLOYDIR)/run_sliderUI.sh <<'EOF'
-#!/bin/sh
-# run_sliderUI.sh - wrapper that sets LD_LIBRARY_PATH to bundled libs (deploy/lib)
-APPDIR="$(dirname "$0")"
-# Prepend app lib to LD_LIBRARY_PATH
-export LD_LIBRARY_PATH="$APPDIR/lib:$LD_LIBRARY_PATH"
-# Useful SDL env overrides
-export SDL_AUDIODRIVER="alsa"
-# Launch the binary (assumes binary sits next to the wrapper)
-cd "$APPDIR"
-exec ./sliderUI
+	@mkdir -p $(DEPLOYDIR)
+	@cat > $(DEPLOYDIR)/run_sliderUI.sh <<'EOF' ;\
+#!/bin/sh\
+# run_sliderUI.sh - wrapper that sets LD_LIBRARY_PATH to bundled libs (deploy/lib)\
+APPDIR="$$(dirname "$$0")"\
+# Prepend app lib to LD_LIBRARY_PATH\
+export LD_LIBRARY_PATH="$$APPDIR/lib:$$LD_LIBRARY_PATH"\
+# Useful SDL env overrides\
+export SDL_AUDIODRIVER="alsa"\
+# Launch the binary (assumes binary sits next to the wrapper)\
+cd "$$APPDIR"\
+exec ./sliderUI\
 EOF
-	chmod +x $(DEPLOYDIR)/run_sliderUI.sh
+	@chmod +x $(DEPLOYDIR)/run_sliderUI.sh
 	@echo "[make] Created wrapper: $(DEPLOYDIR)/run_sliderUI.sh"
 
 # deploy on host to SD card (run from host)
 deploy: check-sd
 	@echo "[make] Deploying to SD card at $(SD)"
-	mkdir -p "$(SD)/App/sliderUI_installer"
-	mkdir -p "$(SD)/App/sliderUI"
-	# copy installer
-	cp -v $(INSTALLER) "$(SD)/App/sliderUI_installer/sliderUI_installer"
-	chmod +x "$(SD)/App/sliderUI_installer/sliderUI_installer"
-	# copy installer resources
+	@mkdir -p "$(SD)/App/sliderUI_installer"
+	@mkdir -p "$(SD)/App/sliderUI"
+	@echo "[make] Copying installer..."
+	@cp -v $(INSTALLER) "$(SD)/App/sliderUI_installer/sliderUI_installer"
+	@chmod +x "$(SD)/App/sliderUI_installer/sliderUI_installer"
 	@if [ -d "$(ASSETS)" ]; then cp -r $(ASSETS) "$(SD)/App/sliderUI_installer/" || true; fi
 	@if [ -d "$(DATA)" ]; then cp -r $(DATA) "$(SD)/App/sliderUI_installer/" || true; fi
 	@if [ -d "$(CONFIG)" ]; then cp -r $(CONFIG) "$(SD)/App/sliderUI_installer/" || true; fi
 	@if [ -d "$(TOOLS)" ]; then cp -r $(TOOLS) "$(SD)/App/sliderUI_installer/" || true; fi
-	# installer metadata
-	cat > "$(SD)/App/sliderUI_installer/metadata.txt" <<EOF
-title=SliderUI Installer
-description=Install SliderUI from the MinUI menu (no terminal)
-exec=/mnt/SDCARD/App/sliderUI_installer/sliderUI_installer
+	@echo "[make] Creating installer metadata..."
+	@cat > "$(SD)/App/sliderUI_installer/metadata.txt" <<'EOF' ;\
+title=SliderUI Installer\
+description=Install SliderUI from the MinUI menu (no terminal)\
+exec=/mnt/SDCARD/App/sliderUI_installer/sliderUI_installer\
 EOF
-	# copy main app (optional) and wrapper/bundle if present
-	if [ -f "$(APP)" ]; then \
-		cp -v $(APP) "$(SD)/App/sliderUI/sliderUI"; chmod +x "$(SD)/App/sliderUI/sliderUI"; \
+	@echo "[make] Copying main app..."
+	@if [ -f "$(APP)" ]; then \
+		cp -v $(APP) "$(SD)/App/sliderUI/sliderUI"; \
+		chmod +x "$(SD)/App/sliderUI/sliderUI"; \
 	fi
-	if [ -d "$(DEPLOYDIR)" ]; then \
+	@if [ -d "$(DEPLOYDIR)" ]; then \
 		cp -r $(DEPLOYDIR)/* "$(SD)/App/sliderUI/" || true; \
 	fi
-	# main app metadata - use wrapper if it exists, otherwise direct binary
+	@echo "[make] Creating main app metadata..."
 	@if [ -f "$(DEPLOYDIR)/run_sliderUI.sh" ]; then \
-		echo "Creating metadata with wrapper script..."; \
-		cat > "$(SD)/App/sliderUI/metadata.txt" <<EOF; \
-title=Slider Mode; \
-description=Kid-friendly slider UI; \
-exec=/mnt/SDCARD/App/sliderUI/run_sliderUI.sh; \
+		echo "Using wrapper script..."; \
+		cat > "$(SD)/App/sliderUI/metadata.txt" <<'EOF' ;\
+title=Slider Mode\
+description=Kid-friendly slider UI\
+exec=/mnt/SDCARD/App/sliderUI/run_sliderUI.sh\
 EOF \
 	else \
-		echo "Creating metadata with direct binary..."; \
-		cat > "$(SD)/App/sliderUI/metadata.txt" <<EOF; \
-title=Slider Mode; \
-description=Kid-friendly slider UI; \
-exec=/mnt/SDCARD/App/sliderUI/sliderUI; \
+		echo "Using direct binary..."; \
+		cat > "$(SD)/App/sliderUI/metadata.txt" <<'EOF' ;\
+title=Slider Mode\
+description=Kid-friendly slider UI\
+exec=/mnt/SDCARD/App/sliderUI/sliderUI\
 EOF \
 	fi
 	@echo "[make] Deploy complete. Remember to safely eject the SD card."
