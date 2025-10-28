@@ -119,6 +119,7 @@ cd sliderUI
 
 # Make scripts executable
 chmod +x full_build.sh
+chmod +x build_in_toolchain.sh
 chmod +x deploy_to_sd.sh
 ```
 

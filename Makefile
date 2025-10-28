@@ -1,14 +1,15 @@
 # Makefile for sliderUI (main app + SDL installer + bundle)
 # Designed to run inside union-miyoomini-toolchain container
 
-# Compiler selection
-CXX ?= arm-linux-gnueabihf-g++
-
-# Toolchain paths - CORRECTED
+# Toolchain paths
 TOOLCHAIN := /opt/miyoomini-toolchain
 SYSROOT := $(TOOLCHAIN)/arm-linux-gnueabihf/libc
 
-# Compiler flags with correct sysroot includes
+# Compiler selection - use the toolchain's cross-compiler
+CXX := $(TOOLCHAIN)/bin/arm-linux-gnueabihf-g++
+CC := $(TOOLCHAIN)/bin/arm-linux-gnueabihf-gcc
+
+# Compiler flags with sysroot includes
 CXXFLAGS = -O2 -Wall -std=c++17 -D_REENTRANT \
 	-I$(SYSROOT)/usr/include \
 	-I$(SYSROOT)/usr/include/SDL \
