@@ -51,13 +51,21 @@ static void drawButton(SDL_Renderer* ren, TTF_Font* f, const Button& b, bool hov
     }
 }
 
-static bool copy_file(const fs::path& src, const fs::path& dst) {
+static bool copy_file(const fs::path& src, const fs::path& dst, bool make_executable = true) {
     try {
         fs::create_directories(dst.parent_path());
         fs::copy_file(src, dst, fs::copy_options::overwrite_existing);
-        chmod(dst.c_str(), 0755);
+        if (make_executable) {
+            if (chmod(dst.c_str(), 0755) != 0) {
+                std::cerr << "Warning: chmod failed for " << dst << "\n";
+                return false;
+            }
+        }
         return true;
-    } catch (...) { return false; }
+    } catch (const std::exception& e) {
+        std::cerr << "Copy failed: " << e.what() << "\n";
+        return false;
+    }
 }
 
 static bool safe_remove_dir(const fs::path& p) {
@@ -74,7 +82,7 @@ int main(int argc, char** argv) {
     if (len != -1) { buff[len] = 0; installerDir = fs::path(buff).parent_path().string(); }
     else installerDir = ".";
 
-    const fs::path BIN_SRC = fs::path(installerDir) / "../build/sliderUI.elf";
+    const fs::path BIN_SRC = fs::path(installerDir) / "../build/sliderUI";
     const fs::path APP_DST = "/mnt/SDCARD/App/sliderUI";
     const fs::path ICON_SRC = fs::path(installerDir) / "../assets/icons";
     const fs::path CONFIG_SRC = fs::path(installerDir) / "../config/sliderUI.cfg";
@@ -89,7 +97,7 @@ int main(int argc, char** argv) {
 
     SDL_Window* win = SDL_CreateWindow("SliderUI Installer", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, W, H, SDL_WINDOW_SHOWN);
     SDL_Renderer* ren = SDL_CreateRenderer(win, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
-    TTF_Font* font = TTF_OpenFont((installerDir + "/../assets/fonts/default.ttf").c_str(), 18);
+    TTF_Font* font = TTF_OpenFont((installerDir + "/assets/fonts/default.ttf").c_str(), 18);
     if (!font) font = nullptr;
 
     std::vector<Button> buttons;
@@ -122,8 +130,27 @@ int main(int argc, char** argv) {
                             SDL_RenderPresent(ren);
 
                             bool ok = true;
-                            if (!fs::exists(BIN_SRC)) { status = "Error: build/sliderUI.elf not found."; ok = false; }
-                            else ok &= copy_file(BIN_SRC, APP_DST / "sliderUI");
+                            
+                            // Fixed: Use correct binary name (no .elf extension)
+                            const fs::path CORRECT_BIN_SRC = fs::path(installerDir) / "build/sliderUI";
+                            
+                            if (!fs::exists(CORRECT_BIN_SRC)) {
+                                status = "Error: build/sliderUI not found at " + CORRECT_BIN_SRC.string();
+                                ok = false;
+                            } else {
+                                ok &= copy_file(CORRECT_BIN_SRC, APP_DST / "sliderUI", true);
+                                
+                                // Double-check executability was set
+                                if (ok) {
+                                    struct stat st;
+                                    if (stat((APP_DST / "sliderUI").c_str(), &st) == 0) {
+                                        if (!(st.st_mode & S_IXUSR)) {
+                                            std::cerr << "Binary not executable, forcing chmod...\n";
+                                            chmod((APP_DST / "sliderUI").c_str(), 0755);
+                                        }
+                                    }
+                                }
+                            }
                             try {
                                 if (fs::exists(ICON_SRC)) {
                                     fs::create_directories(APP_DST / "assets" / "icons");

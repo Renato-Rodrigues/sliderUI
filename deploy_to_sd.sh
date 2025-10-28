@@ -40,11 +40,21 @@ EOF
 echo "[deploy] copying main app (optional)..."
 cp -v "$BUILD/sliderUI" "$SD/App/sliderUI/sliderUI"
 chmod +x "$SD/App/sliderUI/sliderUI"
-cat > "$SD/App/sliderUI/metadata.txt" <<EOF
+if [ -f "$WORKSPACE/deploy/run_sliderUI.sh" ]; then
+  echo "[deploy] Using wrapper script in metadata..."
+  cat > "$SD/App/sliderUI/metadata.txt" <<EOF
 title=Slider Mode
-description=Kid-friendly slider UI (direct run)
+description=Kid-friendly slider UI
 exec=/mnt/SDCARD/App/sliderUI/run_sliderUI.sh
 EOF
+else
+  echo "[deploy] Using direct binary in metadata..."
+  cat > "$SD/App/sliderUI/metadata.txt" <<EOF
+title=Slider Mode
+description=Kid-friendly slider UI
+exec=/mnt/SDCARD/App/sliderUI/sliderUI
+EOF
+fi
 
 # Copy bundle/lib if created
 if [ -d "$WORKSPACE/deploy" ]; then

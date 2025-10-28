@@ -38,7 +38,7 @@ int main(int argc, char** argv) {
     const std::string base_cache_dir = "/mnt/SDCARD/App/sliderUI/cache";
     const std::string dat_cache_file = "/mnt/SDCARD/App/sliderUI/dat_cache.txt";
     const std::string refl_cache_dir = "/mnt/SDCARD/App/sliderUI/cache/reflections";
-    const std::string config_path = "/mnt/SDCARD/App/sliderUI/config.ini";
+    const std::string config_path = "/mnt/SDCARD/Roms/sliderUI.cfg";
 
     // defaults
     int lazy_radius = 2;
@@ -56,38 +56,88 @@ int main(int argc, char** argv) {
         else boxart_transparency = true;
     }
 
+    // Initialize SDL subsystems
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_JOYSTICK | SDL_INIT_GAMECONTROLLER) != 0) {
         std::cerr << "SDL_Init error: " << SDL_GetError() << "\n";
         return 1;
     }
-    if ((IMG_Init(IMG_INIT_PNG | IMG_INIT_JPG) & (IMG_INIT_PNG | IMG_INIT_JPG)) == 0) {
+
+    // Initialize SDL_image
+    int imgFlags = IMG_INIT_PNG | IMG_INIT_JPG;
+    if ((IMG_Init(imgFlags) & imgFlags) != imgFlags) {
         std::cerr << "IMG_Init error: " << IMG_GetError() << "\n";
         SDL_Quit();
         return 1;
     }
+
+    // Initialize SDL_ttf
     if (TTF_Init() == -1) {
         std::cerr << "TTF_Init error: " << TTF_GetError() << "\n";
-        IMG_Quit(); SDL_Quit();
+        IMG_Quit();
+        SDL_Quit();
         return 1;
     }
 
+    // Create window
     const int SCREEN_W = 640, SCREEN_H = 480;
-    SDL_Window* window = SDL_CreateWindow("sliderUI", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-                                          SCREEN_W, SCREEN_H, SDL_WINDOW_SHOWN);
+    SDL_Window* window = SDL_CreateWindow(
+        "sliderUI",
+        SDL_WINDOWPOS_CENTERED,
+        SDL_WINDOWPOS_CENTERED,
+        SCREEN_W, SCREEN_H,
+        SDL_WINDOW_SHOWN
+    );
+
     if (!window) {
         std::cerr << "SDL_CreateWindow failed: " << SDL_GetError() << "\n";
-        TTF_Quit(); IMG_Quit(); SDL_Quit();
+        TTF_Quit();
+        IMG_Quit();
+        SDL_Quit();
         return 1;
     }
-    SDL_Renderer* renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+
+    // Create renderer (try hardware accelerated first, fallback to software)
+    SDL_Renderer* renderer = SDL_CreateRenderer(
+        window, -1,
+        SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC
+    );
+
     if (!renderer) {
+        std::cerr << "Hardware renderer failed, trying software...\n";
         renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_SOFTWARE);
         if (!renderer) {
-            std::cerr << "SDL_CreateRenderer failed\n";
-            SDL_DestroyWindow(window); TTF_Quit(); IMG_Quit(); SDL_Quit();
+            std::cerr << "SDL_CreateRenderer failed (both HW and SW): " << SDL_GetError() << "\n";
+            SDL_DestroyWindow(window);
+            TTF_Quit();
+            IMG_Quit();
+            SDL_Quit();
             return 1;
         }
     }
+
+    // Initialize SliderUI
+    SliderUI ui(renderer, icons_dir, base_cache_dir, dat_cache_file, refl_cache_dir, lazy_radius, boxart_transparency);
+    if (!ui.init(games_list)) {
+        std::cerr << "sliderUI init failed\n";
+        SDL_DestroyRenderer(renderer);
+        SDL_DestroyWindow(window);
+        TTF_Quit();
+        IMG_Quit();
+        SDL_Quit();
+        return 1;
+    }
+
+    // Run the UI
+    ui.run();
+
+    // Cleanup
+    SDL_DestroyRenderer(renderer);
+    SDL_DestroyWindow(window);
+    TTF_Quit();
+    IMG_Quit();
+    SDL_Quit();
+
+    return 0;
 
     SliderUI ui(renderer, icons_dir, base_cache_dir, dat_cache_file, refl_cache_dir, lazy_radius, boxart_transparency);
     if (!ui.init(games_list)) {

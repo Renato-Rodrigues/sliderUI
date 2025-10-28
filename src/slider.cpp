@@ -43,9 +43,15 @@ SliderUI::~SliderUI() {
 
 bool SliderUI::init(const std::string& slider_games_path) {
     // fonts
-    std::string font_path = icons_dir + "/../font.ttf"; // expected path: /mnt/SDCARD/App/sliderUI/assets/font.ttf
+    std::string font_path = icons_dir + "/../fonts/default.ttf"; // Also fixing issue #2
     fontBig = TTF_OpenFont(font_path.c_str(), 28);
     fontSmall = TTF_OpenFont(font_path.c_str(), 18);
+    
+    if (!fontBig || !fontSmall) {
+        std::cerr << "Failed to load fonts from: " << font_path << "\n";
+        return false;
+    }
+    
     // create cache dirs
     fs::create_directories(base_cache_dir);
     fs::create_directories(refl_cache_dir);
@@ -54,7 +60,7 @@ bool SliderUI::init(const std::string& slider_games_path) {
     DatCache datCache(dat_cache_file);
     datCache.load();
 
-    if (!loadGamesList(slider_games_path)) return false;
+    if (!loadGamesList(slider_games_path, datCache)) return false;
 
     // initial lazy load window centered at index 0
     loadAssetsAround(selectedIndex);
@@ -65,7 +71,7 @@ bool SliderUI::init(const std::string& slider_games_path) {
     return true;
 }
 
-bool SliderUI::loadGamesList(const std::string& slider_games_path) {
+bool SliderUI::loadGamesList(const std::string& slider_games_path, DatCache& datCache) {
     std::ifstream f(slider_games_path);
     if (!f.is_open()) {
         std::cerr << "Failed to open slider games list: " << slider_games_path << "\n";
@@ -88,14 +94,12 @@ bool SliderUI::loadGamesList(const std::string& slider_games_path) {
         else g.systemCode = "UNK";
         g.romPath = "/mnt/SDCARD/Roms/" + g.systemFolder + "/" + g.rawGameFile;
 
-        // Use dat_cache to populate displayName and year if possible
+        // Use passed dat_cache to populate displayName and year if possible
         std::string datName;
         size_t p = g.systemFolder.find(" (");
         if (p != std::string::npos) datName = g.systemFolder.substr(0,p);
         else datName = g.systemFolder;
         std::string datPath = "/mnt/SDCARD/Roms/" + g.systemFolder + "/" + datName + ".dat";
-        DatCache datCache(dat_cache_file);
-        datCache.load();
         DatMetadata meta = datCache.getMetadata(g.systemCode, fs::path(g.rawGameFile).stem().string(), datPath);
         if (!meta.description.empty()) g.displayName = meta.description;
         if (meta.year != 0) g.year = meta.year;
@@ -190,7 +194,12 @@ void SliderUI::run() {
         while (SDL_PollEvent(&e)) {
             if (e.type == SDL_QUIT) { running = false; break; }
             bool konami = handleEvent(e);
-            if (konami) { running = false; break; }
+            if (konami) {
+                // Konami code detected - handleEvent already called exit(42)
+                // This line won't be reached, but for clarity:
+                running = false;
+                break;
+            }
         }
         draw();
         Uint32 frameTime = SDL_GetTicks() - frameStart;
@@ -348,18 +357,10 @@ bool SliderUI::handleEvent(SDL_Event& e) {
             if (action == konamiSeq[konamiIndex]) {
                 konamiIndex++;
                 if (konamiIndex >= (int)konamiSeq.size()) {
-                    konamiIndex = 0;
-                    showUnlockAnimation();
-                    pid_t pid = fork();
-                    if (pid == 0) {
-                        execlp("/mnt/SDCARD/.minui/minui_launcher", "minui_launcher", (char*)NULL);
-                        execlp("minui_launcher", "minui_launcher", (char*)NULL);
-                        _exit(127);
-                    } else if (pid > 0) {
-                        int status; waitpid(pid, &status, 0);
-                    }
-                    return true;
-                }
+                konamiIndex = 0;
+                showUnlockAnimation();
+                // Exit with code 42 to signal Konami unlock to launcher script
+                exit(42);
             } else {
                 konamiIndex = (action == konamiSeq[0]) ? 1 : 0;
             }

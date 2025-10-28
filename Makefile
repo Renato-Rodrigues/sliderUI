@@ -67,13 +67,23 @@ bundle: $(APP)
 	@echo "===> Preparing deploy directory..."
 	mkdir -p $(LIB_DIR)
 	@echo "===> Locating required shared libraries listed by readelf..."
-	# readelf may live in toolchain bin folder; try fallback to readelf in PATH
-	READelf := $(shell if [ -x "$(TOOLCHAIN)/bin/readelf" ]; then echo "$(TOOLCHAIN)/bin/readelf"; elif command -v readelf >/dev/null 2>&1; then echo "readelf"; else echo ""; fi)
-	@if [ -z "$(READelf)" ]; then echo "Error: readelf not found in toolchain or PATH."; exit 1; fi
-	@NEEDED_LIBS=`$(READelf) -d $(APP) | grep NEEDED | sed -e 's/.*\\[\\(.*\\)\\].*/\\1/'` ; \
-	if [ -z "$$NEEDED_LIBS" ]; then echo "No NEEDED libs found or error reading ELF."; fi ; \
+	@# readelf may live in toolchain bin folder; try fallback to readelf in PATH
+	@READELF=""; \
+	if [ -x "$(TOOLCHAIN)/bin/readelf" ]; then \
+		READELF="$(TOOLCHAIN)/bin/readelf"; \
+	elif command -v readelf >/dev/null 2>&1; then \
+		READELF="readelf"; \
+	fi; \
+	if [ -z "$$READELF" ]; then \
+		echo "Error: readelf not found in toolchain or PATH."; \
+		exit 1; \
+	fi; \
+	echo "Using readelf: $$READELF"; \
+	NEEDED_LIBS=`$$READELF -d $(APP) | grep NEEDED | sed -e 's/.*\[\(.*\)\].*/\1/'`; \
+	if [ -z "$$NEEDED_LIBS" ]; then \
+		echo "No NEEDED libs found or error reading ELF."; \
+	fi; \
 	for LIB in $$NEEDED_LIBS; do \
-		# try finding first in sysroot then in common lib dirs
 		LIBPATH=`find $(SYSROOT) -name $$LIB 2>/dev/null | head -n 1`; \
 		if [ -z "$$LIBPATH" ]; then \
 			LIBPATH=`find $(SYSROOT) -name "*$$LIB*" 2>/dev/null | head -n 1`; \
@@ -131,12 +141,22 @@ EOF
 	if [ -d "$(DEPLOYDIR)" ]; then \
 		cp -r $(DEPLOYDIR)/* "$(SD)/App/sliderUI/" || true; \
 	fi
-	# main app metadata
-	cat > "$(SD)/App/sliderUI/metadata.txt" <<EOF
-title=Slider Mode
-description=Kid-friendly slider UI (direct run)
-exec=/mnt/SDCARD/App/sliderUI/run_sliderUI.sh
-EOF
+	# main app metadata - use wrapper if it exists, otherwise direct binary
+	@if [ -f "$(DEPLOYDIR)/run_sliderUI.sh" ]; then \
+		echo "Creating metadata with wrapper script..."; \
+		cat > "$(SD)/App/sliderUI/metadata.txt" <<EOF; \
+title=Slider Mode; \
+description=Kid-friendly slider UI; \
+exec=/mnt/SDCARD/App/sliderUI/run_sliderUI.sh; \
+EOF \
+	else \
+		echo "Creating metadata with direct binary..."; \
+		cat > "$(SD)/App/sliderUI/metadata.txt" <<EOF; \
+title=Slider Mode; \
+description=Kid-friendly slider UI; \
+exec=/mnt/SDCARD/App/sliderUI/sliderUI; \
+EOF \
+	fi
 	@echo "[make] Deploy complete. Remember to safely eject the SD card."
 
 # check-sd ensures SD var set and path exists

@@ -29,7 +29,7 @@ sliderUI/
 ├── config/
 │   └── sliderUI.cfg
 ├── data/
-│   └── sliderUI_games.txt
+│   └── sliderUI_games.txt          # example of file located at (/mnt/SDCARD/Roms/sliderUI_games.txt)
 ├── assets/
 │   ├── icons/
 │   │   └── SFC.png
@@ -170,23 +170,63 @@ Both flows are fully automated by `build_in_toolchain.sh` and `deploy_to_sd.sh` 
 
 3. **Manual copy (alternate)**:
 
+   From the `union-miyoomini-toolchain/workspace/sliderUI` directory:
+
    * Copy installer app:
+```bash
+     # Replace /media/<user>/MYSD with your actual SD card mount point
+     SD_MOUNT="/media/$USER/MYSD"
+     
+     # Copy installer binary and resources
+     mkdir -p "$SD_MOUNT/App/sliderUI_installer"
+     cp build/sliderUI_installer "$SD_MOUNT/App/sliderUI_installer/sliderUI_installer"
+     chmod +x "$SD_MOUNT/App/sliderUI_installer/sliderUI_installer"
+     
+     # Copy installer resources (adjust paths to match your repo structure)
+     cp -r assets "$SD_MOUNT/App/sliderUI_installer/" 2>/dev/null || echo "No assets dir"
+     cp -r data "$SD_MOUNT/App/sliderUI_installer/" 2>/dev/null || echo "No data dir"
+     cp -r config "$SD_MOUNT/App/sliderUI_installer/" 2>/dev/null || echo "No config dir"
+     cp -r tools "$SD_MOUNT/App/sliderUI_installer/" 2>/dev/null || echo "No tools dir"
+     
+     # Create installer metadata
+     cat > "$SD_MOUNT/App/sliderUI_installer/metadata.txt" <<EOF
+title=SliderUI Installer
+description=Install SliderUI from the MinUI menu (no terminal)
+exec=/mnt/SDCARD/App/sliderUI_installer/sliderUI_installer
+EOF
+```
 
-     ```
-     mkdir -p /media/<user>/MYSD/App/sliderUI_installer
-     cp build/sliderUI_installer /media/<user>/MYSD/App/sliderUI_installer/sliderUI_installer
-     chmod +x /media/<user>/MYSD/App/sliderUI_installer/sliderUI_installer
-     cp -r assets data config tools /media/<user>/MYSD/App/sliderUI_installer/
-     ```
-   * If you used bundling:
+   * If you ran `make bundle` and `make install-wrapper`:
+```bash
+     # Copy bundled app with dependencies
+     mkdir -p "$SD_MOUNT/App/sliderUI"
+     cp -r deploy/* "$SD_MOUNT/App/sliderUI/"
+     cp build/sliderUI "$SD_MOUNT/App/sliderUI/sliderUI"
+     chmod +x "$SD_MOUNT/App/sliderUI/sliderUI"
+     chmod +x "$SD_MOUNT/App/sliderUI/run_sliderUI.sh"
+     
+     # Create app metadata (using wrapper)
+     cat > "$SD_MOUNT/App/sliderUI/metadata.txt" <<EOF
+title=Slider Mode
+description=Kid-friendly slider UI
+exec=/mnt/SDCARD/App/sliderUI/run_sliderUI.sh
+EOF
+```
 
-     ```
-     mkdir -p /media/<user>/MYSD/App/sliderUI
-     cp -r deploy/* /media/<user>/MYSD/App/sliderUI/
-     cp build/sliderUI /media/<user>/MYSD/App/sliderUI/sliderUI
-     chmod +x /media/<user>/MYSD/App/sliderUI/sliderUI
-     ```
-   * Create `metadata.txt` files for MinUI (installer & app). The deploy script already does this.
+   * If you did NOT use bundling (direct binary only):
+```bash
+     # Copy main app binary only
+     mkdir -p "$SD_MOUNT/App/sliderUI"
+     cp build/sliderUI "$SD_MOUNT/App/sliderUI/sliderUI"
+     chmod +x "$SD_MOUNT/App/sliderUI/sliderUI"
+     
+     # Create app metadata (direct binary)
+     cat > "$SD_MOUNT/App/sliderUI/metadata.txt" <<EOF
+title=Slider Mode
+description=Kid-friendly slider UI
+exec=/mnt/SDCARD/App/sliderUI/sliderUI
+EOF
+```
 
 4. Unmount SD card safely and put it into Miyoo Mini Plus.
 
@@ -209,7 +249,16 @@ Both flows are fully automated by `build_in_toolchain.sh` and `deploy_to_sd.sh` 
 * If `make` complains about missing SDL headers/libs inside the docker container, ensure the `shauninman/union-miyoomini-toolchain` image was built/pulled correctly. Paste build errors here and I will debug.
 * If binary crashes on device due to missing `.so`, use the `bundle` output copied to `/mnt/SDCARD/App/sliderUI/lib/` and launch via `/mnt/SDCARD/App/sliderUI/run_sliderUI.sh`.
 * If you want a full tarball of the repo with all files populated, say so and I will generate the archive contents for you to copy.
-* `stb_image_write.h` is required by `reflection_cache.cpp`. Download it into `src/` if missing.
+
+### Required Third-Party Header
+
+`stb_image_write.h` is required by `reflection_cache.cpp` for PNG writing:
+```bash
+# Download into src/ directory before building
+cd src/
+wget https://raw.githubusercontent.com/nothings/stb/master/stb_image_write.h
+```
+Alternatively, download manually from: https://github.com/nothings/stb/blob/master/stb_image_write.h
 
 ---
 

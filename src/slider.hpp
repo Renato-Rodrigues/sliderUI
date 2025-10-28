@@ -55,7 +55,7 @@ private:
     int lazyRadius;
     bool boxartTransparency;
 
-    bool loadGamesList(const std::string& slider_games_path);
+    bool loadGamesList(const std::string& slider_games_path, DatCache& datCache);
     void loadAssetsAround(int index);
     void unloadAssetsOutside(int index);
     void loadGameAssets(GameEntry& g);
