@@ -4,17 +4,18 @@
 # Compiler selection
 CXX ?= arm-linux-gnueabihf-g++
 
-# Toolchain paths
-TOOLCHAIN := /opt/union_toolchain
-SYSROOT := $(TOOLCHAIN)/sysroot
+# Toolchain paths - CORRECTED
+TOOLCHAIN := /opt/miyoomini-toolchain
+SYSROOT := $(TOOLCHAIN)/arm-linux-gnueabihf/libc
 
-# Compiler flags with sysroot includes
+# Compiler flags with correct sysroot includes
 CXXFLAGS = -O2 -Wall -std=c++17 -D_REENTRANT \
 	-I$(SYSROOT)/usr/include \
 	-I$(SYSROOT)/usr/include/SDL \
 	-I$(SYSROOT)/usr/include/arm-linux-gnueabihf
 
-LDFLAGS = -L$(SYSROOT)/usr/lib/arm-linux-gnueabihf \
+LDFLAGS = -L$(SYSROOT)/usr/lib \
+	-L$(SYSROOT)/usr/lib/arm-linux-gnueabihf \
 	-lSDL -lSDL_image -lSDL_ttf -lstdc++fs -lpthread
 
 SRCDIR = src

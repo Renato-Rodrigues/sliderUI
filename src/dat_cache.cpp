@@ -58,10 +58,10 @@ bool DatCache::parseDatFile(const std::string& systemCode, const std::string& da
     if (!in.is_open()) return false;
     std::string content((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
 
-    // Define regex patterns once at the top
-    std::regex gameRe(R"(<game\s+name\s*=\s*"([^"]+)")", std::regex::icase);
-    std::regex descRe(R"(<description>([^<]+)</description>)", std::regex::icase);
-    std::regex yearRe(R"(<year>(\d{4})</year>)", std::regex::icase);
+    // Define regex patterns - using R"DELIM( )DELIM" syntax to avoid quote issues
+    std::regex gameRe(R"DELIM(<game\s+name\s*=\s*"([^"]+)")DELIM", std::regex::icase);
+    std::regex descRe(R"DELIM(<description>([^<]+)</description>)DELIM", std::regex::icase);
+    std::regex yearRe(R"DELIM(<year>(\d{4})</year>)DELIM", std::regex::icase);
     
     std::smatch m;
     auto start = content.cbegin();
