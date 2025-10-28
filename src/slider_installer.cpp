@@ -51,7 +51,7 @@ static void drawButton(SDL_Surface* screen, TTF_Font* f, const Button& b, bool h
     }
 }
 
-static bool copy_file(const fs::path& src, const fs::path& dst, bool make_executable = true) {
+static bool copy_file_custom(const fs::path& src, const fs::path& dst, bool make_executable = true) {
     try {
         fs::create_directories(dst.parent_path());
         fs::copy_file(src, dst, fs::copy_options::overwrite_existing);
@@ -158,7 +158,7 @@ int main(int argc, char** argv) {
                             status = "Error: build/sliderUI not found.";
                             ok = false;
                         } else {
-                            ok &= copy_file(BIN_SRC, APP_DST / "sliderUI", true);
+                            ok &= copy_file_custom(BIN_SRC, APP_DST / "sliderUI", true);
                             
                             // Double-check executability
                             if (ok) {
@@ -206,7 +206,7 @@ int main(int argc, char** argv) {
                         status = "Installing autorun...";
                         fs::create_directories(AUTORUN_DST_DIR);
                         if (fs::exists(AUTORUN_SRC)) {
-                            bool ok = copy_file(AUTORUN_SRC, AUTORUN_DST);
+                            bool ok = copy_file_custom(AUTORUN_SRC, AUTORUN_DST);
                             if (ok) status = "Autorun launcher installed.";
                             else status = "Failed to install autorun.";
                         } else {

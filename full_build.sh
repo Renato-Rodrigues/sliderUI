@@ -45,11 +45,12 @@ fi
 echo ""
 echo "[4/4] Verifying SDL dependencies..."
 echo "Expected: libSDL-1.2.so.0 (NOT libSDL2)"
+
 docker run --rm \
   -v "$PROJECT_ROOT":/app \
   -w /app \
   union-miyoomini-toolchain:latest \
-  arm-linux-gnueabihf-readelf -d build/sliderUI | grep "libSDL"
+  /opt/miyoomini-toolchain/bin/arm-linux-gnueabihf-readelf -d build/sliderUI | grep "libSDL"
 
 echo ""
 echo "=========================================="

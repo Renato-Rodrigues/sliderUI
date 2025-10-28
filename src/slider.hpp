@@ -38,6 +38,7 @@ public:
 
     bool init(const std::string& slider_games_path);
     void run();
+    enum KonamiAction { KA_UP, KA_DOWN, KA_LEFT, KA_RIGHT, KA_B, KA_A, KA_NONE };
 
 private:
     SDL_Surface* screen;
@@ -71,7 +72,6 @@ private:
     void blitSurfaceAlpha(SDL_Surface* src, SDL_Rect* srcrect, SDL_Surface* dst, SDL_Rect* dstrect, Uint8 alpha);
     SDL_Surface* scaleSurface(SDL_Surface* src, int newW, int newH);
 
-    enum KonamiAction { KA_UP, KA_DOWN, KA_LEFT, KA_RIGHT, KA_B, KA_A, KA_NONE };
     std::vector<KonamiAction> konamiSeq;
     int konamiIndex;
     Uint32 lastKonamiTime;

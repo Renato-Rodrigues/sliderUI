@@ -24,15 +24,17 @@ BUILDDIR = build
 DEPLOYDIR = deploy
 LIB_DIR = $(DEPLOYDIR)/lib
 
-APP_SRC = $(SRCDIR)/main.cpp $(SRCDIR)/slider.cpp $(SRCDIR)/reflection_cache.cpp $(SRCDIR)/dat_cache.cpp
+APP_SRC = $(SRCDIR)/main.cpp $(SRCDIR)/slider.cpp $(SRCDIR)/reflection_cache.cpp $(SRCDIR)/dat_cache.cpp $(SRCDIR)/stb_image_write.cpp
 APP = $(BUILDDIR)/sliderUI
 
 INSTALLER_SRC = $(SRCDIR)/slider_installer.cpp
 INSTALLER = $(BUILDDIR)/sliderUI_installer
 
-.PHONY: all clean app installer checksums bundle install-wrapper
+READELF := $(TOOLCHAIN)/bin/arm-linux-gnueabihf-readelf
 
-all: app installer checksums
+.PHONY: all clean app installer checksums bundle install-wrapper verify_sdl
+
+all: app installer checksums bundle install-wrapper verify_sdl
 
 app: $(APP)
 
@@ -62,20 +64,7 @@ bundle: $(APP)
 	@echo "===> Preparing deploy directory..."
 	@mkdir -p $(LIB_DIR)
 	@echo "===> Locating required shared libraries..."
-	@READELF=""; \
-	if [ -x "$(TOOLCHAIN)/bin/arm-linux-gnueabihf-readelf" ]; then \
-		READELF="$(TOOLCHAIN)/bin/arm-linux-gnueabihf-readelf"; \
-	elif command -v arm-linux-gnueabihf-readelf >/dev/null 2>&1; then \
-		READELF="arm-linux-gnueabihf-readelf"; \
-	elif command -v readelf >/dev/null 2>&1; then \
-		READELF="readelf"; \
-	fi; \
-	if [ -z "$$READELF" ]; then \
-		echo "Error: readelf not found"; \
-		exit 1; \
-	fi; \
-	echo "Using: $$READELF"; \
-	NEEDED_LIBS=`$$READELF -d $(APP) | grep NEEDED | sed -e 's/.*\[\(.*\)\].*/\1/'`; \
+	NEEDED_LIBS=`$(READELF) -d $(APP) | grep NEEDED | sed -e 's/.*\[\(.*\)\].*/\1/'`; \
 	for LIB in $$NEEDED_LIBS; do \
 		LIBPATH=`find $(SYSROOT)/usr/lib -name "$$LIB" 2>/dev/null | head -n 1`; \
 		if [ -z "$$LIBPATH" ]; then \
@@ -100,3 +89,8 @@ install-wrapper:
 	@printf 'exec ./sliderUI\n' >> $(DEPLOYDIR)/run_sliderUI.sh
 	@chmod +x $(DEPLOYDIR)/run_sliderUI.sh
 	@echo "[make] Created wrapper: $(DEPLOYDIR)/run_sliderUI.sh"
+
+verify_sdl:
+	@echo "[make] Verifying SDL dependencies..."
+	@$(READELF) -V >/dev/null 2>&1 || echo "Warning: readelf not found or not executable"
+	@echo "Expected: libSDL-1.2.so.0 (NOT libSDL2)"
