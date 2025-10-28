@@ -73,202 +73,173 @@ sliderUI/
 
 ## Build & deploy (step-by-step)
 
-These are the two recommended flows:
+### **Prerequisites**
 
-- **A. Build inside the union-miyoomini-toolchain Docker image (recommended)**
-- **B. Deploy to SD card (host)**
-
-Both flows are fully automated by `build_in_toolchain.sh` and `deploy_to_sd.sh` (included).
-
-### A — Build with `shauninman/union-miyoomini-toolchain` (Docker)
-
-1. **Clone the toolchain repo (host):**
-
+1. **Windows with WSL2 (Ubuntu/Debian)**
+2. **Docker Desktop** installed and running
+3. **Basic tools in WSL:**
    ```bash
-   cd ~
-   git clone https://github.com/shauninman/union-miyoomini-toolchain.git
-   cd union-miyoomini-toolchain
-   ````
-
-2. **Prepare workspace and place `sliderUI` into it:**
-
-   ```bash
-   mkdir -p workspace
-   # Option 1: copy your local project
-   cp -r /path/to/your/sliderUI ./workspace/sliderUI
-
-   # Option 2: clone sliderUI repo into workspace
-   # cd workspace && git clone <your-sliderUI-repo> sliderUI
+   sudo apt update
+   sudo apt install -y git curl build-essential
    ```
 
-3. Install / Open **Docker Desktop** (Windows)
+### **Step 1: Setup Toolchain (One-Time)**
 
-- If you already have it installed → open it.
-- Otherwise download: [https://www.docker.com/products/docker-desktop/](https://www.docker.com/products/docker-desktop/)
+```bash
+# Navigate to your home directory
+cd ~
 
-- Enable **WSL Integration**
-  - Open **Docker Desktop → Settings → Resources → WSL Integration**
-  - Check:
-  ``` 
-  ☑ Enable integration with my default WSL distro
-  ☑ Ubuntu / Debian (whichever your WSL uses)
-  ```
-  - Click **Apply & Restart**
+# Clone the toolchain
+git clone https://github.com/shauninman/union-miyoomini-toolchain.git
+cd union-miyoomini-toolchain
 
-- Confirm Docker is visible inside WSL
-  - In your WSL shell: 
-  ```bash
-  docker --version
-  ```
+# if this PR is not merged yet, do the changes you can find here: https://github.com/shauninman/union-miyoomini-toolchain/pull/3/files
 
-4. Run the toolchain image locally (one time)
+# Build the Docker image (this takes 10-30 minutes)
+docker build -t union-miyoomini-toolchain:latest .
 
-  - from the MinUI toolchain folder:
-  ```bash
-  cd ./
-  docker build -t union-miyoomini-toolchain .
-  ```
-  - When finished, check:
-  ```bash
-  docker images | grep union
-  ```
+# Verify the image was created
+docker images | grep union
+```
 
-  - Expected output example:
-  ```
-  union-miyoomini-toolchain   latest   <some-id>   <size>
-  ```
+**Expected output:**
+```
+union-miyoomini-toolchain   latest   abc123def456   500MB
+```
 
-5. **Build SliderUI using the helper script** (or run docker manually):
+### **Step 2: Get Your sliderUI Project**
 
-   * From the `union-miyoomini-toolchain` repo root:
-  
-   ```bash
-   cd ./workspace/sliderUI
-   chmod +x build_in_toolchain.sh
-   ./build_in_toolchain.sh
-   ```
-   (By default it uses the repo's Dockerfile if present, otherwise pulls `shauninman/union-miyoomini-toolchain`.)
+```bash
+# Still in ~/ or wherever you want your project
+cd ~
 
-   * Equivalent manual docker command (example):
+# Clone your sliderUI repository
+git clone https://github.com/Renato-Rodrigues/sliderUI.git
+cd sliderUI
 
-     ```bash
-     docker run --rm -v "$(pwd)/workspace":/root/workspace -w /root/workspace/sliderUI shauninman/union-miyoomini-toolchain:latest /bin/bash -lc "make clean; make -j\$(nproc) all"
-     ```
+# Make scripts executable
+chmod +x build_in_toolchain.sh
+chmod +x deploy_to_sd.sh
+```
 
-6. **Check artifacts on host:**
-   The built artifacts are on host under:
+### **Step 3: Build the Project**
 
-   ```
-   union-miyoomini-toolchain/workspace/sliderUI/build/
-   ```
+```bash
+# From the sliderUI directory
+./build_in_toolchain.sh
+```
 
-   Expected files:
+**What this does:**
+- Downloads `stb_image_write.h` if missing
+- Runs the Docker container
+- Compiles both `sliderUI` and `sliderUI_installer`
+- Creates checksums
 
-   * `build/sliderUI`
-   * `build/sliderUI_installer`
-   * `build/*.sha256`
+**Expected output:**
+```
+==========================================
+Build SUCCESS!
+==========================================
+Artifacts:
+-rwxr-xr-x 1 user user 234K build/sliderUI
+-rwxr-xr-x 1 user user 189K build/sliderUI_installer
+-rw-r--r-- 1 user user   78 build/sliderUI.sha256
+-rw-r--r-- 1 user user   86 build/sliderUI_installer.sha256
+```
 
-7. **Bundle runtime libraries (optional but recommended)**
-   Inside the same Docker shell or on host (after build), from project root:
+### **Step 4: Bundle Libraries (Optional but Recommended)**
 
-   ```bash
-   cd workspace/sliderUI
-   make bundle
-   make install-wrapper
-   ```
+```bash
+# Run the bundle command inside Docker
+docker run --rm \
+  -u "$(id -u):$(id -g)" \
+  -v "$(pwd)":/app \
+  -w /app \
+  union-miyoomini-toolchain:latest \
+  /bin/bash -c "make bundle && make install-wrapper"
 
-   * `make bundle` creates `deploy/lib/` with the exact `.so` dependencies found in the `sliderUI` ELF (copied from sysroot inside the toolchain).
-   * `make install-wrapper` creates `deploy/run_sliderUI.sh`.
+# Check the deploy directory was created
+ls -la deploy/
+```
 
-   After these steps `deploy/` contains `run_sliderUI.sh` and `lib/`.
+### **Step 5: Deploy to SD Card**
+
+```bash
+# Insert your SD card and find its mount point
+# Usually: /media/$USER/XXXXX or /mnt/XXXXX
+lsblk
+
+# Deploy (replace with your actual mount point)
+./deploy_to_sd.sh /media/$USER/MYSD
+
+# Safely unmount
+sync
+sudo umount /media/$USER/MYSD
+```
 
 ---
 
-### B — Deploy to SD card (host)
+## **Common Errors and Solutions**
 
-1. Mount your SD card on the host. Example mount point:
+### **Error: "fatal error: SDL2/SDL.h: No such file or directory"**
 
-   ```
-   /media/$USER/MYSD
-   ```
-
-   Replace with the actual mountpoint on your machine.
-
-2. Use the included `deploy_to_sd.sh` to copy everything (recommended). From the `union-miyoomini-toolchain` root:
-
-   ```bash
-   ./deploy_to_sd.sh /path/to/SD_MOUNT
-   ```
-
-   What gets copied:
-
-   * `build/sliderUI_installer` → `/mnt/SDCARD/App/sliderUI_installer/sliderUI_installer`
-   * `assets/`, `data/`, `config/`, `tools/` → under installer folder
-   * optionally `build/sliderUI` → `/mnt/SDCARD/App/sliderUI/sliderUI`
-   * if you ran `make bundle` & `make install-wrapper`, copy `deploy/*` contents into `/mnt/SDCARD/App/sliderUI/` instead to have bundled libs + `run_sliderUI.sh`.
-
-3. **Manual copy (alternate)**:
-
-   From the `union-miyoomini-toolchain/workspace/sliderUI` directory:
-
-   * Copy installer app:
+**Solution:** The toolchain image wasn't built correctly. Rebuild it:
 ```bash
-     # Replace /media/<user>/MYSD with your actual SD card mount point
-     SD_MOUNT="/media/$USER/MYSD"
-     
-     # Copy installer binary and resources
-     mkdir -p "$SD_MOUNT/App/sliderUI_installer"
-     cp build/sliderUI_installer "$SD_MOUNT/App/sliderUI_installer/sliderUI_installer"
-     chmod +x "$SD_MOUNT/App/sliderUI_installer/sliderUI_installer"
-     
-     # Copy installer resources (adjust paths to match your repo structure)
-     cp -r assets "$SD_MOUNT/App/sliderUI_installer/" 2>/dev/null || echo "No assets dir"
-     cp -r data "$SD_MOUNT/App/sliderUI_installer/" 2>/dev/null || echo "No data dir"
-     cp -r config "$SD_MOUNT/App/sliderUI_installer/" 2>/dev/null || echo "No config dir"
-     cp -r tools "$SD_MOUNT/App/sliderUI_installer/" 2>/dev/null || echo "No tools dir"
-     
-     # Create installer metadata
-     cat > "$SD_MOUNT/App/sliderUI_installer/metadata.txt" <<EOF
-title=SliderUI Installer
-description=Install SliderUI from the MinUI menu (no terminal)
-exec=/mnt/SDCARD/App/sliderUI_installer/sliderUI_installer
-EOF
+cd ~/union-miyoomini-toolchain
+docker build --no-cache -t union-miyoomini-toolchain:latest .
 ```
 
-   * If you ran `make bundle` and `make install-wrapper`:
+### **Error: "stb_image_write.h: No such file"**
+
+**Solution:** Download manually:
 ```bash
-     # Copy bundled app with dependencies
-     mkdir -p "$SD_MOUNT/App/sliderUI"
-     cp -r deploy/* "$SD_MOUNT/App/sliderUI/"
-     cp build/sliderUI "$SD_MOUNT/App/sliderUI/sliderUI"
-     chmod +x "$SD_MOUNT/App/sliderUI/sliderUI"
-     chmod +x "$SD_MOUNT/App/sliderUI/run_sliderUI.sh"
-     
-     # Create app metadata (using wrapper)
-     cat > "$SD_MOUNT/App/sliderUI/metadata.txt" <<EOF
-title=Slider Mode
-description=Kid-friendly slider UI
-exec=/mnt/SDCARD/App/sliderUI/run_sliderUI.sh
-EOF
+cd src/
+curl -O https://raw.githubusercontent.com/nothings/stb/master/stb_image_write.h
+cd ..
 ```
 
-   * If you did NOT use bundling (direct binary only):
+### **Error: "Permission denied" when building**
+
+**Solution:** The `-u "$(id -u):$(id -g)"` flag should fix this. If not:
 ```bash
-     # Copy main app binary only
-     mkdir -p "$SD_MOUNT/App/sliderUI"
-     cp build/sliderUI "$SD_MOUNT/App/sliderUI/sliderUI"
-     chmod +x "$SD_MOUNT/App/sliderUI/sliderUI"
-     
-     # Create app metadata (direct binary)
-     cat > "$SD_MOUNT/App/sliderUI/metadata.txt" <<EOF
-title=Slider Mode
-description=Kid-friendly slider UI
-exec=/mnt/SDCARD/App/sliderUI/sliderUI
-EOF
+# Clean up any root-owned files
+sudo rm -rf build/ deploy/
+# Try again
+./build_in_toolchain.sh
 ```
 
-4. Unmount SD card safely and put it into Miyoo Mini Plus.
+### **Error: "docker: command not found" in WSL**
 
+**Solution:** Enable WSL integration in Docker Desktop:
+1. Open Docker Desktop
+2. Settings → Resources → WSL Integration
+3. Enable your WSL distro
+4. Apply & Restart
+5. Test: `docker --version`
+
+---
+
+## **Verify Your Build**
+
+After building, check that you have:
+
+```bash
+ls -lh build/
+```
+
+Should show:
+- `sliderUI` (~200-300KB)
+- `sliderUI_installer` (~150-200KB)
+- `*.sha256` files
+
+```bash
+file build/sliderUI
+```
+
+Should show:
+```
+build/sliderUI: ELF 32-bit LSB executable, ARM, EABI5 version 1 (SYSV), dynamically linked...
+```
 ---
 
 ## On-device usage (MinUI)
@@ -282,12 +253,6 @@ EOF
 * To toggle autorun (parental control) from MinUI only, run the `Toggle Kids Mode` app installed by the installer (not available inside sliderUI).
 
 ---
-
-## Notes & troubleshooting
-
-* If `make` complains about missing SDL headers/libs inside the docker container, ensure the `shauninman/union-miyoomini-toolchain` image was built/pulled correctly. Paste build errors here and I will debug.
-* If binary crashes on device due to missing `.so`, use the `bundle` output copied to `/mnt/SDCARD/App/sliderUI/lib/` and launch via `/mnt/SDCARD/App/sliderUI/run_sliderUI.sh`.
-* If you want a full tarball of the repo with all files populated, say so and I will generate the archive contents for you to copy.
 
 ### Required Third-Party Header
 

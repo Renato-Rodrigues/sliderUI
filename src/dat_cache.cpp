@@ -58,23 +58,13 @@ bool DatCache::parseDatFile(const std::string& systemCode, const std::string& da
     if (!in.is_open()) return false;
     std::string content((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
 
-    // FIX: Using custom raw string delimiter R"###(...)###" to safely handle quotes inside the regex pattern.
-    std::regex gameRe(R"###(<game\s+name\s*=\s*"([^"]+)">)###", std::regex::icase);
-    std::regex descRe(R"###(<description>([^<]+)</description>)###", std::regex::icase);
-    std::regex yearRe(R"###(<year>(\d{4})</year>)###", std::regex::icase);
+    // Define regex patterns once
+    std::regex gameRe(R"(<game\s+name\s*=\s*"([^"]+)")", std::regex::icase);
+    std::regex descRe(R"(<description>([^<]+)</description>)", std::regex::icase);
+    std::regex yearRe(R"(<year>(\d{4})</year>)", std::regex::icase);
+    
     std::smatch m;
     auto start = content.cbegin();
-    
-    // NOTE: The original regex was R"(<game\s+name\s*=\s*"([^"]+)")" which was the source of the syntax error.
-    // I am assuming the intention was to match the opening tag <game name="...">, which usually ends with '>', 
-    // though the provided block logic might be missing the full block match. 
-    // I am making the minimal fix to R"###(<game\s+name\s*=\s*"([^"]+)")###" to fix the syntax error,
-    // and assuming the logic that reads the content block works as intended.
-    // Further testing may be needed if the block parsing fails, but this fixes the compilation issue.
-    // Reverting to the minimal fix to solve the reported error only:
-    std::regex gameRe(R"###(<game\s+name\s*=\s*"([^"]+)")###", std::regex::icase);
-
-
     while (std::regex_search(start, content.cend(), m, gameRe)) {
         std::string gameName = m[1];
         size_t pos = m.position(0);

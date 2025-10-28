@@ -1,7 +1,7 @@
 #ifndef REFLECTION_CACHE_HPP
 #define REFLECTION_CACHE_HPP
 
-#include <SDL.h>
+#include <SDL2/SDL.h>
 #include <string>
 
 // Creates or loads a reflection texture for the given boxart path.

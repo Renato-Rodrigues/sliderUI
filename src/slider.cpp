@@ -1,8 +1,8 @@
 #include "slider.hpp"
 #include "reflection_cache.hpp"
 #include "dat_cache.h"
-#include <SDL_image.h>
-#include <SDL_ttf.h>
+#include <SDL2/SDL_image.h>
+#include <SDL2/SDL_ttf.h>
 #include <fstream>
 #include <sstream>
 #include <iostream>

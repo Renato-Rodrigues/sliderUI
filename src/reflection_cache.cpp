@@ -1,6 +1,6 @@
 #include "reflection_cache.hpp"
 #include "stb_image_write.h"
-#include <SDL_image.h>
+#include <SDL2/SDL_image.h>
 #include <filesystem>
 #include <iostream>
 
