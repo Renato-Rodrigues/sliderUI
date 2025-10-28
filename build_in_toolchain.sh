@@ -1,44 +1,65 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Get the absolute path to the project directory (where this script is)
-PROJECT_ROOT=$(pwd)
+# Get the absolute path to the project directory
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# --- No more copying ---
-# The old logic of copying source into a 'workspace' subdirectory was
-# causing recursive copy errors and permission issues.
-# Instead, we will mount the entire project directory directly.
-
-# ✅ Always use the LOCAL toolchain image
+# Use local toolchain image
 IMAGE_NAME="union-miyoomini-toolchain:latest"
 
-echo "[build] Using local toolchain image: $IMAGE_NAME"
-echo "[build] Mounting project directory: $PROJECT_ROOT"
+echo "=========================================="
+echo "Building sliderUI"
+echo "=========================================="
+echo "Project root: $PROJECT_ROOT"
+echo "Image: $IMAGE_NAME"
+echo ""
 
-# --- One-time cleanup ---
-# If you are getting "Permission denied" errors from a previous build,
-# you must run 'sudo rm -rf workspace/' ONCE from this directory
-# to remove the old root-owned files. This script will no longer use
-# or create that 'workspace' directory.
+# Check if image exists
+if ! docker images | grep -q "union-miyoomini-toolchain"; then
+    echo "ERROR: Docker image 'union-miyoomini-toolchain' not found!"
+    echo "Please build it first with:"
+    echo "  cd /path/to/union-miyoomini-toolchain"
+    echo "  docker build -t union-miyoomini-toolchain:latest ."
+    exit 1
+fi
 
-echo "[build] Running container to build sliderUI and installer..."
+# Download stb_image_write.h if missing
+if [ ! -f "$PROJECT_ROOT/src/stb_image_write.h" ]; then
+    echo "[build] Downloading stb_image_write.h..."
+    curl -o "$PROJECT_ROOT/src/stb_image_write.h" \
+        https://raw.githubusercontent.com/nothings/stb/master/stb_image_write.h
+    echo "[build] Downloaded stb_image_write.h"
+fi
 
-# We construct the entire build command as a single line string to avoid
-# multi-line parsing issues by the host shell.
-# We explicitly call 'pwd' and 'nproc' inside the container via escaped $()
-BUILD_COMMAND="set -e; echo '[container] In directory: \$(pwd) (Expected: /app)'; echo '[container] Running make clean...'; make clean || true; echo '[container] Running make all...'; make -j\$(nproc) all"
+echo "[build] Running build in container..."
 
-# Run the container:
-# - Mount the current project directory (PROJECT_ROOT) to /app inside the container
-# - Set the working directory inside the container to /app
-# - Run as the host user ("$(id -u):$(id -g)") to avoid file permission problems
 docker run --rm \
   -u "$(id -u):$(id -g)" \
   -v "$PROJECT_ROOT":/app \
   -w /app \
   "$IMAGE_NAME" \
-  /bin/bash -c "$BUILD_COMMAND"
+  /bin/bash -c "set -e && echo 'Container working directory:' && pwd && make clean && make -j\$(nproc) all"
 
-echo "[build] Build finished. Artifacts in: $PROJECT_ROOT/build"
-ls -l "$PROJECT_ROOT/build"
-cat "$PROJECT_ROOT/build/"*.sha256 || true
+BUILD_EXIT=$?
+
+if [ $BUILD_EXIT -eq 0 ]; then
+    echo ""
+    echo "=========================================="
+    echo "Build SUCCESS!"
+    echo "=========================================="
+    echo "Artifacts:"
+    ls -lh "$PROJECT_ROOT/build/"
+    echo ""
+    if [ -f "$PROJECT_ROOT/build/sliderUI.sha256" ]; then
+        cat "$PROJECT_ROOT/build/sliderUI.sha256"
+    fi
+    if [ -f "$PROJECT_ROOT/build/sliderUI_installer.sha256" ]; then
+        cat "$PROJECT_ROOT/build/sliderUI_installer.sha256"
+    fi
+else
+    echo ""
+    echo "=========================================="
+    echo "Build FAILED!"
+    echo "=========================================="
+    exit $BUILD_EXIT
+fi
