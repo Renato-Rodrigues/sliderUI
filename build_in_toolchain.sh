@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
-SLIDERUI_SRC=${1:-}
+
+SLIDERUI_SRC=${1:-.}
 TOOLCHAIN_REPO_DIR=$(pwd)
 WORKSPACE_DIR="$TOOLCHAIN_REPO_DIR/workspace"
 
+# If user passed a directory, refresh code inside workspace
 if [ -n "$SLIDERUI_SRC" ]; then
   echo "[build] Copying sliderUI source from $SLIDERUI_SRC into workspace..."
   rm -rf "$WORKSPACE_DIR/sliderUI"
@@ -11,19 +13,21 @@ if [ -n "$SLIDERUI_SRC" ]; then
   cp -r "$SLIDERUI_SRC" "$WORKSPACE_DIR/sliderUI"
 fi
 
-IMAGE_NAME="sliderui_union_toolchain"
-if [ -f Dockerfile ]; then
-  echo "[build] Building toolchain image locally as $IMAGE_NAME"
-  docker build -t "$IMAGE_NAME" .
-else
-  IMAGE_NAME="shauninman/union-miyoomini-toolchain:latest"
-  docker pull "$IMAGE_NAME" || { echo "Failed to pull toolchain image."; exit 2; }
-fi
+# ✅ Always use the LOCAL toolchain image
+IMAGE_NAME="union-miyoomini-toolchain:latest"
+
+echo "[build] Using local toolchain image: $IMAGE_NAME"
 
 echo "[build] Running container to build sliderUI and installer..."
-docker run --rm -v "$WORKSPACE_DIR":/root/workspace -w /root/workspace/sliderUI "$IMAGE_NAME" /bin/bash -lc "\
+docker run --rm \
+  -u "$(id -u):$(id -g)" \
+  -v "$WORKSPACE_DIR":/root/workspace \
+  -w /root/workspace/sliderUI \
+  "$IMAGE_NAME" \
+  /bin/bash -lc "\
 set -e; \
 echo '[container] pwd:' \$(pwd); \
+source /root/.bashrc || true; \
 make clean || true; \
 make -j\$(nproc) all \
 "
