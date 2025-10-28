@@ -58,7 +58,7 @@ bool DatCache::parseDatFile(const std::string& systemCode, const std::string& da
     if (!in.is_open()) return false;
     std::string content((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
 
-    // Define regex patterns once
+    // Define regex patterns once at the top
     std::regex gameRe(R"(<game\s+name\s*=\s*"([^"]+)")", std::regex::icase);
     std::regex descRe(R"(<description>([^<]+)</description>)", std::regex::icase);
     std::regex yearRe(R"(<year>(\d{4})</year>)", std::regex::icase);
@@ -71,6 +71,7 @@ bool DatCache::parseDatFile(const std::string& systemCode, const std::string& da
         size_t blockStart = pos;
         size_t nextPos = content.find("<game", pos+5);
         std::string block = content.substr(blockStart, nextPos - blockStart);
+        
         std::smatch desc, yr;
         DatMetadata meta;
         if (std::regex_search(block, desc, descRe)) meta.description = desc[1];

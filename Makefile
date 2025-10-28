@@ -4,18 +4,18 @@
 # Compiler selection
 CXX ?= arm-linux-gnueabihf-g++
 
-# Toolchain paths (must be defined before use)
+# Toolchain paths
 TOOLCHAIN := /opt/union_toolchain
 SYSROOT := $(TOOLCHAIN)/sysroot
 
 # Compiler flags with sysroot includes
 CXXFLAGS = -O2 -Wall -std=c++17 -D_REENTRANT \
 	-I$(SYSROOT)/usr/include \
-	-I$(SYSROOT)/usr/include/SDL2 \
+	-I$(SYSROOT)/usr/include/SDL \
 	-I$(SYSROOT)/usr/include/arm-linux-gnueabihf
 
 LDFLAGS = -L$(SYSROOT)/usr/lib/arm-linux-gnueabihf \
-	-lSDL2 -lSDL2_image -lSDL2_ttf -lstdc++fs
+	-lSDL -lSDL_image -lSDL_ttf -lstdc++fs -lpthread
 
 SRCDIR = src
 BUILDDIR = build
@@ -93,7 +93,7 @@ install-wrapper:
 	@printf '#!/bin/sh\n' > $(DEPLOYDIR)/run_sliderUI.sh
 	@printf 'APPDIR="$$(dirname "$$0")"\n' >> $(DEPLOYDIR)/run_sliderUI.sh
 	@printf 'export LD_LIBRARY_PATH="$$APPDIR/lib:$$LD_LIBRARY_PATH"\n' >> $(DEPLOYDIR)/run_sliderUI.sh
-	@printf 'export SDL_AUDIODRIVER="alsa"\n' >> $(DEPLOYDIR)/run_sliderUI.sh
+	@printf 'export SDL_NOMOUSE=1\n' >> $(DEPLOYDIR)/run_sliderUI.sh
 	@printf 'cd "$$APPDIR"\n' >> $(DEPLOYDIR)/run_sliderUI.sh
 	@printf 'exec ./sliderUI\n' >> $(DEPLOYDIR)/run_sliderUI.sh
 	@chmod +x $(DEPLOYDIR)/run_sliderUI.sh

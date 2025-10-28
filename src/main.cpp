@@ -1,7 +1,7 @@
 #include "slider.hpp"
-#include <SDL2/SDL.h>
-#include <SDL2/SDL_image.h>
-#include <SDL2/SDL_ttf.h>
+#include <SDL.h>
+#include <SDL_image.h>
+#include <SDL_ttf.h>
 #include <fstream>
 #include <iostream>
 #include <string>
@@ -56,8 +56,8 @@ int main(int argc, char** argv) {
         else boxart_transparency = true;
     }
 
-    // Initialize SDL subsystems
-    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_JOYSTICK | SDL_INIT_GAMECONTROLLER) != 0) {
+    // Initialize SDL
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_JOYSTICK) != 0) {
         std::cerr << "SDL_Init error: " << SDL_GetError() << "\n";
         return 1;
     }
@@ -78,49 +78,25 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    // Create window
+    // Create screen (640x480, 32-bit)
     const int SCREEN_W = 640, SCREEN_H = 480;
-    SDL_Window* window = SDL_CreateWindow(
-        "sliderUI",
-        SDL_WINDOWPOS_CENTERED,
-        SDL_WINDOWPOS_CENTERED,
-        SCREEN_W, SCREEN_H,
-        SDL_WINDOW_SHOWN
-    );
-
-    if (!window) {
-        std::cerr << "SDL_CreateWindow failed: " << SDL_GetError() << "\n";
+    SDL_Surface* screen = SDL_SetVideoMode(SCREEN_W, SCREEN_H, 32, SDL_HWSURFACE | SDL_DOUBLEBUF);
+    
+    if (!screen) {
+        std::cerr << "SDL_SetVideoMode failed: " << SDL_GetError() << "\n";
         TTF_Quit();
         IMG_Quit();
         SDL_Quit();
         return 1;
     }
 
-    // Create renderer (try hardware accelerated first, fallback to software)
-    SDL_Renderer* renderer = SDL_CreateRenderer(
-        window, -1,
-        SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC
-    );
-
-    if (!renderer) {
-        std::cerr << "Hardware renderer failed, trying software...\n";
-        renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_SOFTWARE);
-        if (!renderer) {
-            std::cerr << "SDL_CreateRenderer failed (both HW and SW): " << SDL_GetError() << "\n";
-            SDL_DestroyWindow(window);
-            TTF_Quit();
-            IMG_Quit();
-            SDL_Quit();
-            return 1;
-        }
-    }
+    // Hide cursor
+    SDL_ShowCursor(SDL_DISABLE);
 
     // Initialize SliderUI
-    SliderUI ui(renderer, icons_dir, base_cache_dir, dat_cache_file, refl_cache_dir, lazy_radius, boxart_transparency);
+    SliderUI ui(screen, icons_dir, base_cache_dir, dat_cache_file, refl_cache_dir, lazy_radius, boxart_transparency);
     if (!ui.init(games_list)) {
         std::cerr << "sliderUI init failed\n";
-        SDL_DestroyRenderer(renderer);
-        SDL_DestroyWindow(window);
         TTF_Quit();
         IMG_Quit();
         SDL_Quit();
@@ -131,28 +107,9 @@ int main(int argc, char** argv) {
     ui.run();
 
     // Cleanup
-    SDL_DestroyRenderer(renderer);
-    SDL_DestroyWindow(window);
     TTF_Quit();
     IMG_Quit();
     SDL_Quit();
 
-    return 0;
-
-    SliderUI ui(renderer, icons_dir, base_cache_dir, dat_cache_file, refl_cache_dir, lazy_radius, boxart_transparency);
-    if (!ui.init(games_list)) {
-        std::cerr << "sliderUI init failed\n";
-        SDL_DestroyRenderer(renderer); SDL_DestroyWindow(window);
-        TTF_Quit(); IMG_Quit(); SDL_Quit();
-        return 1;
-    }
-
-    ui.run();
-
-    SDL_DestroyRenderer(renderer);
-    SDL_DestroyWindow(window);
-    TTF_Quit();
-    IMG_Quit();
-    SDL_Quit();
     return 0;
 }

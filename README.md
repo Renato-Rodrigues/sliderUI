@@ -118,33 +118,15 @@ git clone https://github.com/Renato-Rodrigues/sliderUI.git
 cd sliderUI
 
 # Make scripts executable
-chmod +x build_in_toolchain.sh
+chmod +x full_build.sh
 chmod +x deploy_to_sd.sh
 ```
 
 ### **Step 3: Build the Project**
 
 ```bash
-# From the sliderUI directory
-./build_in_toolchain.sh
-```
-
-**What this does:**
-- Downloads `stb_image_write.h` if missing
-- Runs the Docker container
-- Compiles both `sliderUI` and `sliderUI_installer`
-- Creates checksums
-
-**Expected output:**
-```
-==========================================
-Build SUCCESS!
-==========================================
-Artifacts:
--rwxr-xr-x 1 user user 234K build/sliderUI
--rwxr-xr-x 1 user user 189K build/sliderUI_installer
--rw-r--r-- 1 user user   78 build/sliderUI.sha256
--rw-r--r-- 1 user user   86 build/sliderUI_installer.sha256
+# Run complete build
+./full_build.sh
 ```
 
 ### **Step 4: Bundle Libraries (Optional but Recommended)**
@@ -179,46 +161,6 @@ sudo umount /media/$USER/MYSD
 
 ---
 
-## **Common Errors and Solutions**
-
-### **Error: "fatal error: SDL2/SDL.h: No such file or directory"**
-
-**Solution:** The toolchain image wasn't built correctly. Rebuild it:
-```bash
-cd ~/union-miyoomini-toolchain
-docker build --no-cache -t union-miyoomini-toolchain:latest .
-```
-
-### **Error: "stb_image_write.h: No such file"**
-
-**Solution:** Download manually:
-```bash
-cd src/
-curl -O https://raw.githubusercontent.com/nothings/stb/master/stb_image_write.h
-cd ..
-```
-
-### **Error: "Permission denied" when building**
-
-**Solution:** The `-u "$(id -u):$(id -g)"` flag should fix this. If not:
-```bash
-# Clean up any root-owned files
-sudo rm -rf build/ deploy/
-# Try again
-./build_in_toolchain.sh
-```
-
-### **Error: "docker: command not found" in WSL**
-
-**Solution:** Enable WSL integration in Docker Desktop:
-1. Open Docker Desktop
-2. Settings → Resources → WSL Integration
-3. Enable your WSL distro
-4. Apply & Restart
-5. Test: `docker --version`
-
----
-
 ## **Verify Your Build**
 
 After building, check that you have:
@@ -242,15 +184,112 @@ build/sliderUI: ELF 32-bit LSB executable, ARM, EABI5 version 1 (SYSV), dynamica
 ```
 ---
 
-## On-device usage (MinUI)
 
-* Boot device and open **Apps**:
+---
 
-  * `SliderUI Installer` — runs the installer UI (Install / Enable Auto-boot / Disable Auto-boot / Uninstall / Exit).
-  * After using **Install**, a new app entry `Slider Mode` will appear (or installer created autorun).
-* To enable auto-boot (Kids Mode), use the installer button or the `Enable Auto-boot` option.
-* From inside sliderUI, enter the Konami code `↑ ↑ ↓ ↓ ← → ← → B A` to return to full MinUI.
-* To toggle autorun (parental control) from MinUI only, run the `Toggle Kids Mode` app installed by the installer (not available inside sliderUI).
+## **Troubleshooting SDL 1.2 Build Issues**
+
+### **Issue: "SDL.h not found"**
+
+The toolchain might not have SDL 1.2 development headers. Check inside the Docker container:
+
+```bash
+docker run --rm -it union-miyoomini-toolchain:latest /bin/bash
+
+# Inside container:
+ls /opt/union_toolchain/sysroot/usr/include/ | grep -i sdl
+ls /opt/union_toolchain/sysroot/usr/lib/arm-linux-gnueabihf/ | grep -i sdl
+```
+
+**Expected files:**
+```
+/usr/include/SDL/
+/usr/lib/arm-linux-gnueabihf/libSDL-1.2.so
+/usr/lib/arm-linux-gnueabihf/libSDL_image-1.2.so
+/usr/lib/arm-linux-gnueabihf/libSDL_ttf-2.0.so
+```
+
+If these are missing, you need to update the toolchain Dockerfile to include SDL 1.2 development packages.
+
+### **Issue: Linking errors for SDL functions**
+
+Add `-lpthread` to LDFLAGS in Makefile (already included above).
+
+### **Issue: "undefined reference to pthread_create"**
+
+The order matters in linking. Update Makefile LDFLAGS:
+
+```makefile
+LDFLAGS = -L$(SYSROOT)/usr/lib/arm-linux-gnueabihf \
+	-lSDL -lSDL_image -lSDL_ttf -lstdc++fs -lpthread -lm
+```
+
+---
+
+## **Final Verification Checklist**
+
+Before deploying to device:
+
+- [ ] Build completes without errors
+- [ ] `build/sliderUI` and `build/sliderUI_installer` exist
+- [ ] Binary size is reasonable (~200-400KB each)
+- [ ] `readelf` shows SDL 1.2 dependencies (not SDL2)
+- [ ] `file` command shows ARM 32-bit ELF
+- [ ] `deploy/` directory contains bundled libraries (optional)
+- [ ] `deploy/run_sliderUI.sh` exists (if bundled)
+
+Check binary architecture:
+
+```bash
+file build/sliderUI
+```
+
+**Expected:**
+```
+build/sliderUI: ELF 32-bit LSB executable, ARM, EABI5 version 1 (SYSV), dynamically linked, interpreter /lib/ld-linux-armhf.so.3, for GNU/Linux 3.2.0, not stripped
+```
+
+---
+
+## **Testing on Device**
+
+1. **Insert SD card into Miyoo Mini Plus**
+2. **Power on and navigate to Apps**
+3. **You should see:**
+   - `SliderUI Installer` app
+4. **Run installer and select "Install / Update SliderUI"**
+5. **After install, you should see:**
+   - a new app entry `Slider Mode` app
+6. To enable auto-boot (Kids Mode), use the installer button or the `Enable Auto-boot` option.
+7. From inside sliderUI, enter the Konami code `↑ ↑ ↓ ↓ ← → ← → B A` to return to full MinUI.
+8. To toggle autorun (parental control) from MinUI only, run the `Toggle Kids Mode` app installed by the installer (not available inside sliderUI).
+
+---
+
+## **Common Runtime Issues**
+
+### **Black screen on launch**
+
+- Check that fonts exist at `/mnt/SDCARD/App/sliderUI/assets/fonts/default.ttf`
+- Check logs if MinUI provides them
+- Verify screen resolution is 640x480
+
+### **No games showing**
+
+- Check `/mnt/SDCARD/Roms/sliderUI_games.txt` exists
+- Verify format: `SystemFolder (CODE);GameFileName.ext`
+- Example: `SNES (SFC);Super Mario World.sfc`
+
+### **Missing box art**
+
+- Box art should be at: `/mnt/SDCARD/Roms/SYSTEMFOLDER/.res/GAMENAME.png`
+- The `.res` folder is hidden - make sure it exists
+
+### **Joystick not working**
+
+- SDL 1.2 joystick support on Miyoo Mini Plus should work automatically
+- Buttons: A=0, B=1, X=2, Y=3
+- D-pad uses hat events
 
 ---
 

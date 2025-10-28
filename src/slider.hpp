@@ -1,8 +1,8 @@
 #ifndef SLIDER_HPP
 #define SLIDER_HPP
 
-#include <SDL2/SDL.h>
-#include <SDL2/SDL_ttf.h>
+#include <SDL.h>
+#include <SDL_ttf.h>
 #include <string>
 #include <vector>
 
@@ -17,16 +17,16 @@ struct GameEntry {
     std::string boxartPath;
     std::string systemIconPath;
 
-    SDL_Texture* boxart = nullptr;
-    SDL_Texture* reflection = nullptr;
-    SDL_Texture* systemIcon = nullptr;
+    SDL_Surface* boxart = nullptr;
+    SDL_Surface* reflection = nullptr;
+    SDL_Surface* systemIcon = nullptr;
 
     bool assetsLoaded = false;
 };
 
 class SliderUI {
 public:
-    SliderUI(SDL_Renderer* renderer,
+    SliderUI(SDL_Surface* screen,
              const std::string& icons_dir,
              const std::string& base_cache_dir,
              const std::string& dat_cache_file,
@@ -40,7 +40,7 @@ public:
     void run();
 
 private:
-    SDL_Renderer* renderer;
+    SDL_Surface* screen;
     TTF_Font* fontBig;
     TTF_Font* fontSmall;
 
@@ -55,7 +55,7 @@ private:
     int lazyRadius;
     bool boxartTransparency;
 
-    bool loadGamesList(const std::string& slider_games_path, DatCache& datCache);
+    bool loadGamesList(const std::string& slider_games_path);
     void loadAssetsAround(int index);
     void unloadAssetsOutside(int index);
     void loadGameAssets(GameEntry& g);
@@ -66,6 +66,10 @@ private:
     void launchROM(const std::string& rom);
     bool handleEvent(SDL_Event& e);
     void showUnlockAnimation();
+    
+    // Helper for blitting with alpha
+    void blitSurfaceAlpha(SDL_Surface* src, SDL_Rect* srcrect, SDL_Surface* dst, SDL_Rect* dstrect, Uint8 alpha);
+    SDL_Surface* scaleSurface(SDL_Surface* src, int newW, int newH);
 
     enum KonamiAction { KA_UP, KA_DOWN, KA_LEFT, KA_RIGHT, KA_B, KA_A, KA_NONE };
     std::vector<KonamiAction> konamiSeq;
