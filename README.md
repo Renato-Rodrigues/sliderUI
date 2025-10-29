@@ -169,7 +169,7 @@ Bind + attach (replace `<BUSID>`):
 
 ```powershell
 usbipd bind --busid <BUSID>
-usbipd attach --busid <BUSID>
+usbipd attach --wsl --busid <BUSID>
 ```
 
 Restart your WSL terminal if already open.
