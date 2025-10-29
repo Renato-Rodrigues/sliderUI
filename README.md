@@ -145,27 +145,7 @@ docker run --rm \
 ls -la deploy/
 ```
 
-### **Step 5: Deploy to SD Card**
-# sliderUI — Miyoo Mini Plus (MinUI) Carousel Launcher
-
-sliderUI is a kid-friendly carousel / launcher for the Miyoo Mini Plus running MinUI.
-It provides:
-
-* Horizontal carousel with centered box art and orange outline on selected item.
-* Precomputed reflection images (cached) to reduce runtime cost.
-* Lazy loading of box art and icons (configurable).
-* `.dat` XML parsing with checksum-style cache to avoid re-parsing unchanged files.
-* Installer app that runs from MinUI (no terminal required) to install/update/uninstall.
-* Autorun (Kids Mode) with Konami code to exit to the full MinUI.
-* Parental toggle app (accessible only from MinUI) that enables/disables autorun.
-* Self-contained deployment option: `make bundle` copies required `.so` files to `deploy/lib/` and `run_sliderUI.sh` sets `LD_LIBRARY_PATH` to them at runtime.
-* Deploy helper scripts for the union-miyoomini-toolchain Docker image.
-
----
-
-(README content truncated for brevity in this demo)
-
-## Deploying the SD Card from WSL (Windows Users)
+### **Step 5: Deploy to SD Card from WSL (Windows Users)**
 
 If you're using **WSL2** on Windows, you can mount the SD card inside WSL to run `deploy_to_sd.sh` directly.
 
