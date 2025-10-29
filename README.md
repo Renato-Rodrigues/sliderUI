@@ -146,19 +146,82 @@ ls -la deploy/
 ```
 
 ### **Step 5: Deploy to SD Card**
+# sliderUI — Miyoo Mini Plus (MinUI) Carousel Launcher
+
+sliderUI is a kid-friendly carousel / launcher for the Miyoo Mini Plus running MinUI.
+It provides:
+
+* Horizontal carousel with centered box art and orange outline on selected item.
+* Precomputed reflection images (cached) to reduce runtime cost.
+* Lazy loading of box art and icons (configurable).
+* `.dat` XML parsing with checksum-style cache to avoid re-parsing unchanged files.
+* Installer app that runs from MinUI (no terminal required) to install/update/uninstall.
+* Autorun (Kids Mode) with Konami code to exit to the full MinUI.
+* Parental toggle app (accessible only from MinUI) that enables/disables autorun.
+* Self-contained deployment option: `make bundle` copies required `.so` files to `deploy/lib/` and `run_sliderUI.sh` sets `LD_LIBRARY_PATH` to them at runtime.
+* Deploy helper scripts for the union-miyoomini-toolchain Docker image.
+
+---
+
+(README content truncated for brevity in this demo)
+
+## Deploying the SD Card from WSL (Windows Users)
+
+If you're using **WSL2** on Windows, you can mount the SD card inside WSL to run `deploy_to_sd.sh` directly.
+
+### 1. Install usbipd (Windows, Admin PowerShell)
+
+```powershell
+winget install usbipd
+```
+
+(or download from [https://github.com/dorssel/usbipd-win/releases](https://github.com/dorssel/usbipd-win/releases))
+
+### 2. Attach the SD card to WSL
+
+List USB devices:
+
+```powershell
+usbipd wsl list
+```
+
+Bind + attach (replace `<BUSID>`):
+
+```powershell
+usbipd wsl bind --busid <BUSID>
+usbipd wsl attach --busid <BUSID>
+```
+
+Restart your WSL terminal if already open.
+
+### 3. Mount the SD card in WSL
 
 ```bash
-# Insert your SD card and find its mount point
-# Usually: /media/$USER/XXXXX or /mnt/XXXXX
-lsblk
-
-# Deploy (replace with your actual mount point)
-./deploy_to_sd.sh /media/$USER/MYSD
-
-# Safely unmount
-sync
-sudo umount /media/$USER/MYSD
+lsblk               # find device, e.g. /dev/sdb1
+sudo mkdir -p /mnt/sdcard
+sudo mount /dev/sdb1 /mnt/sdcard
 ```
+
+### 4. Deploy
+
+```bash
+sudo ./deploy_to_sd.sh /mnt/sdcard
+```
+
+### 5. Safely Unmount
+
+```bash
+sudo sync
+sudo umount /mnt/sdcard
+```
+
+Detach from Windows:
+
+```powershell
+usbipd wsl detach --busid <BUSID>
+```
+
+Done — now remove the SD card normally.
 
 ---
 
