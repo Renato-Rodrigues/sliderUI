@@ -162,14 +162,14 @@ winget install usbipd
 List USB devices:
 
 ```powershell
-usbipd wsl list
+usbipd list
 ```
 
 Bind + attach (replace `<BUSID>`):
 
 ```powershell
-usbipd wsl bind --busid <BUSID>
-usbipd wsl attach --busid <BUSID>
+usbipd bind --busid <BUSID>
+usbipd attach --busid <BUSID>
 ```
 
 Restart your WSL terminal if already open.
