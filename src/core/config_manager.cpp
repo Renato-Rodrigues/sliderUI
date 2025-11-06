@@ -95,7 +95,7 @@ json make_defaults() {
       {"release_order", "ascending"}
     }},
     {"platform", {
-      {"icons_path", "platform/"},
+      {"icons_path", ""},
       {"image_formats", {"png","jpg","webp"}},
       {"image_max_dimensions", {640,480}}
     }},

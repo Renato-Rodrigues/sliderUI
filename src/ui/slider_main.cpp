@@ -1,14 +1,19 @@
 // src/slider_main.cpp
+#include "core/global.h"
 #include <string>
 #include <iostream>
 #include "ui/renderer.h"
+#include "core/file_utils.h"
 
 // forward declare slider_main in ui namespace
 namespace ui { int slider_main(const std::string &config_path, const std::string &csv_path, const std::string &mode, const std::string &exit_mode_flag); }
 
 int main(int argc, char **argv) {
-  std::string config_path = "./sliderUI_cfg.json";
-  std::string csv_path = "./gameList.csv";
+
+  global::g_exe_dir = file_utils::get_exe_dir();
+
+  std::string config_path = global::g_exe_dir + "cfg/sliderUI_cfg.json";
+  std::string csv_path = global::g_exe_dir + "gameList.csv";
   std::string mode = ""; // e.g., "kidsmode"
   std::string exit_mode_flag = ""; // e.g., "konami"
 

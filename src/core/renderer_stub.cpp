@@ -48,6 +48,8 @@ Input poll_input() {
         case 'u': case 'U': return Input::X;
         case 'i': case 'I': return Input::Y;
         case 'm': case 'M': return Input::MENU;
+        case 'q': case 'Q': return Input::START;
+        case 'w': case 'W': return Input::SELECT;
         default: return Input::NONE;
     }
 }

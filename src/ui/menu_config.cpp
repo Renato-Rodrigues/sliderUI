@@ -1,3 +1,4 @@
+#include "core/global.h"
 #include "ui/menu_config.h"
 #include "core/logger.h"
 #include <iostream>
@@ -6,7 +7,7 @@ namespace ui {
 namespace menu {
 
 core::ConfigManager MenuConfig::cfg_;
-std::string MenuConfig::config_path_ = "sliderUI_cfg.json";
+std::string MenuConfig::config_path_ = global::g_exe_dir + "cfg/sliderUI_cfg.json";
 bool MenuConfig::initialized_ = false;
 bool MenuConfig::hot_reload_enabled_ = false;
 bool MenuConfig::hot_reload_checked_ = false;
@@ -30,7 +31,7 @@ bool MenuConfig::reload() {
 bool MenuConfig::is_hot_reload_enabled() {
     if (!initialized_) {
         // Auto-initialize if not already done
-        if (!init()) {
+        if (!init(global::g_exe_dir + "cfg/sliderUI_cfg.json")) {
             return false;  // Default to disabled if can't load config
         }
     }
@@ -51,7 +52,7 @@ void MenuConfig::reload_if_enabled() {
 int MenuConfig::get_int(const std::string& key, int fallback) {
     if (!initialized_) {
         // Auto-initialize if not already done
-        if (!init()) {
+        if (!init(global::g_exe_dir + "cfg/sliderUI_cfg.json")) {
             return fallback;
         }
     }

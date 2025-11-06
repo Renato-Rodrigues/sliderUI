@@ -17,7 +17,7 @@ namespace menu {
 class MenuConfig {
 public:
     // Initialize and load config from file
-    static bool init(const std::string& config_path = "sliderUI_cfg.json");
+    static bool init(const std::string& config_path);
     
     // Reload config from file (useful for hot-reloading)
     static bool reload();

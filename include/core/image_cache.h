@@ -1,66 +1,53 @@
+// include/core/image_cache.h
 #pragma once
-#ifndef SLIDERUI_CORE_IMAGE_CACHE_H
-#define SLIDERUI_CORE_IMAGE_CACHE_H
 
-#include "core/image_loader.h"
-
-#include <optional>
 #include <string>
-#include <mutex>
-#include <list>
 #include <unordered_map>
-#include <deque>
-#include <utility>
-#include <cstddef>
+#include <mutex>
+#include <vector>
 
 namespace core {
 
-/**
- * ImageCache
- *
- * Cooperative LRU cache for Texture objects.
- */
+struct ImageData {
+    std::string path;
+    int width = 0;
+    int height = 0;
+    int channels = 0; // 3 => RGB, 4 => RGBA
+    std::vector<unsigned char> pixels; // decoded pixels, row-major
+};
+
 class ImageCache {
 public:
-  explicit ImageCache(size_t capacity = 3);
-  ~ImageCache();
+    ImageCache();
+    ~ImageCache();
 
-  // Return a copy of texture if present. Moves entry to most-recently-used.
-  std::optional<Texture> get(const std::string &path);
+    // ensure image is decoded and cached (returns true on success)
+    bool preload(const std::string &path);
 
-  // Enqueue a decode task with target size (cooperative). Thread-safe push.
-  void preload_priority(const std::string &path, int target_w, int target_h);
+    bool has(const std::string &path) const;
+    ImageData get(const std::string &path) const;
 
-  // Perform one pending decode task (if any). Decoding is done here; this may be slow.
-  // Returns true if a task was executed (regardless of decode success).
-  bool tick_one_task();
+    // NEW: return a cached native surface (SDL_Surface*) or nullptr if not available.
+    // Owned by ImageCache; do not free the pointer.
+    void *get_surface_for_path(const std::string &path);
 
-  // Current number of cached entries
-  size_t size() const;
+    // configure whether ImageCache should prefer RGBA surfaces (true) or RGB-only (false).
+    // Default is false (RGB only).
+    void set_prefer_rgba(bool v);
+
+    // remove cached decoded images and surfaces
+    void clear();
 
 private:
-  // non-copyable
-  ImageCache(const ImageCache&) = delete;
-  ImageCache& operator=(const ImageCache&) = delete;
+    bool decode_image_to_memory(const std::string &path, ImageData &out);
 
-  struct Pending {
-    std::string path;
-    int w;
-    int h;
-  };
+    mutable std::mutex mtx_;
+    std::unordered_map<std::string, ImageData> cache_;
 
-  size_t capacity_;
+    // store native surfaces as void* to avoid SDL headers in the public header
+    std::unordered_map<std::string, void*> surface_cache_;
 
-  // LRU: front = most recent, back = least recent
-  std::list<std::string> lru_list_;
-  // map path -> pair<Texture, iterator into lru_list_>
-  std::unordered_map<std::string, std::pair<Texture, std::list<std::string>::iterator>> cache_;
-
-  // pending tasks queue protected by mutex (no threads created here, but safe)
-  std::deque<Pending> pending_tasks_;
-  mutable std::mutex pending_mutex_;
+    bool prefer_rgba_;
 };
 
 } // namespace core
-
-#endif // SLIDERUI_CORE_IMAGE_CACHE_H

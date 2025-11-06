@@ -1,4 +1,5 @@
 // src/ui/slider_ui.cpp
+#include "core/global.h"
 #include "ui/renderer.h"
 #include "ui/menu_config.h"
 #include "core/config_manager.h"
@@ -97,20 +98,35 @@ int slider_main(const std::string &config_path,
   }
   if (active >= view.size()) active = 0;
 
-  // Image cache
-  ImageCache cache(3);
+  // Image cache (synchronous, matches current core/image_cache.cpp API)
+  ImageCache cache;
+
+  // Honor optional RGBA preference from config (default: false => RGB-only)
+  bool prefer_rgba = cfg.get<bool>("ui.images.rgba", false);
+  cache.set_prefer_rgba(prefer_rgba);
 
   // Initialize menu config (loads sliderUI_cfg.json)
-  menu::MenuConfig::init("sliderUI_cfg.json");
+  menu::MenuConfig::init(global::g_exe_dir + "cfg/sliderUI_cfg.json");
 
   // Renderer
   Renderer renderer;
   renderer.init();
+  
+  // Pass config to renderer for aesthetics
+  renderer.set_config(&cfg);
 
   bool running = true;
   bool pending_delete = false;
+  bool needs_redraw = true;  // Dirty flag: true = needs to redraw
   auto pending_since = std::chrono::steady_clock::time_point{};
   const auto confirm_timeout = std::chrono::milliseconds(confirm_timeout_ms);
+
+  // Key repeat state
+  ui::Input last_input = ui::Input::NONE;
+  auto last_input_time = std::chrono::steady_clock::now();
+  const auto key_repeat_initial_delay = std::chrono::milliseconds(500);  // Wait 500ms before repeat
+  const auto key_repeat_rate = std::chrono::milliseconds(150);           // Then repeat every 150ms
+  bool is_repeating = false;
 
   // Helper to persist current sort_mode string to cfg
   auto save_sort_mode = [&](SortMode m) {
@@ -139,97 +155,136 @@ int slider_main(const std::string &config_path,
 
   // Main loop
   while (running) {
-    // cooperative decode: ensure prev/current/next are queued
+    // cooperative decode: ensure prev/current/next are queued (synchronous preload)
     if (!view.empty()) {
       size_t n = view.size();
       size_t idx_prev = (active == 0) ? (n - 1) : (active - 1);
       size_t idx_next = (active + 1) % n;
-      cache.preload_priority(view[idx_prev].path, cfg.get<int>("ui.game_image.width", 240),
-                                         cfg.get<int>("ui.game_image.height", 160));
-      cache.preload_priority(view[active].path, cfg.get<int>("ui.game_image.width", 240),
-                                       cfg.get<int>("ui.game_image.height", 160));
-      cache.preload_priority(view[idx_next].path, cfg.get<int>("ui.game_image.width", 240),
-                                        cfg.get<int>("ui.game_image.height", 160));
+
+      // Use synchronous preload available in ImageCache implementation
+      cache.preload(view[idx_prev].path);
+      cache.preload(view[active].path);
+      cache.preload(view[idx_next].path);
     }
 
-    // Process one decode task cooperatively
-    cache.tick_one_task();
+    // NOTE: your ImageCache implementation is synchronous. There is no tick_one_task() here.
+    // If you later add an async queue, reintroduce tick_one_task() call here.
 
     // Input
     ui::Input in = ui::poll_input();
-
-    if (in == ui::Input::LEFT) {
-      if (!view.empty()) {
-        active = (active + view.size() - 1) % view.size();
-        pending_delete = false; // any navigation cancels pending deletion
-      }
-    } else if (in == ui::Input::RIGHT) {
-      if (!view.empty()) {
-        active = (active + 1) % view.size();
-        pending_delete = false;
-      }
-    } else if (in == ui::Input::A) {
-      if (!view.empty()) {
-        const Game &g = view[active];
-        // Save last played to config
-        cfg.set<std::string>("behavior.last_game", g.path);
-        cfg.save(config_path);
-        // Launch - in stub we only log; in a non-stub build you might call system(...)
-        std::cout << "[slider] launching game: " << g.path << " (stub: logging only)\n";
-        Logger::instance().info(std::string("launch: ") + g.path);
-        // If you want to actually run: system(g.path.c_str()); but we avoid it in stub.
-      }
-    } else if (in == ui::Input::X) {
-      // cycle sort: alphabetical -> release -> custom -> alphabetical...
-      if (sort_mode == SortMode::ALPHA) sort_mode = SortMode::RELEASE;
-      else if (sort_mode == SortMode::RELEASE) sort_mode = SortMode::CUSTOM;
-      else sort_mode = SortMode::ALPHA;
-      save_sort_mode(sort_mode);
-      // On sort change reset active to 0 as specified
-      active = 0;
-      rebuild_view();
-      pending_delete = false;
-    } else if (in == ui::Input::Y) {
-      // confirm-delete flow
-      if (!pending_delete) {
-        // begin pending deletion
-        pending_delete = true;
-        pending_since = std::chrono::steady_clock::now();
-        // UI will show overlay
+    
+    // Handle key repeat logic
+    auto now = std::chrono::steady_clock::now();
+    bool should_process_input = false;
+    
+    if (in != ui::Input::NONE) {
+      if (in == last_input) {
+        // Same key is still held
+        auto time_since_press = now - last_input_time;
+        if (!is_repeating && time_since_press >= key_repeat_initial_delay) {
+          // Initial delay passed, start repeating
+          is_repeating = true;
+          last_input_time = now;
+          should_process_input = true;
+        } else if (is_repeating && time_since_press >= key_repeat_rate) {
+          // Repeat rate passed, trigger again
+          last_input_time = now;
+          should_process_input = true;
+        }
       } else {
-        // confirm if within timeout
-        auto now = std::chrono::steady_clock::now();
-        if (now - pending_since <= confirm_timeout) {
-          if (!view.empty()) {
-            // Find this game's index in DB (GameDB stores canonical order)
-            std::string path_to_remove = view[active].path;
-            size_t idx_in_db = game_db.find_by_path(path_to_remove);
-            if (idx_in_db < game_db.games().size()) {
-              bool removed = game_db.remove(idx_in_db);
-              if (!removed) {
-                std::cerr << "[slider] failed to remove entry from GameDB\n";
-              } else {
-                if (!game_db.commit()) {
-                  std::cerr << "[slider] failed to commit GameDB after removal\n";
+        // New key pressed
+        last_input = in;
+        last_input_time = now;
+        is_repeating = false;
+        should_process_input = true;
+      }
+    } else {
+      // No input - reset state
+      last_input = ui::Input::NONE;
+      is_repeating = false;
+    }
+    
+    // Only process input if it's a new press or repeat triggered
+    if (should_process_input) {
+      if (in == ui::Input::LEFT) {
+        if (!view.empty()) {
+          active = (active + view.size() - 1) % view.size();
+          pending_delete = false; // any navigation cancels pending deletion
+          needs_redraw = true;    // Mark for redraw
+        }
+      } else if (in == ui::Input::RIGHT) {
+        if (!view.empty()) {
+          active = (active + 1) % view.size();
+          pending_delete = false;
+          needs_redraw = true;    // Mark for redraw
+        }
+      } else if (in == ui::Input::A) {
+        if (!view.empty()) {
+          const Game &g = view[active];
+          // Save last played to config
+          cfg.set<std::string>("behavior.last_game", g.path);
+          cfg.save(config_path);
+          // Launch - in stub we only log; in a non-stub build you might call system(...)
+          std::cout << "[slider] launching game: " << g.path << " (stub: logging only)\n";
+          Logger::instance().info(std::string("launch: ") + g.path);
+          // No redraw needed for launch, but you could add it if you want feedback
+        }
+      } else if (in == ui::Input::X) {
+        // cycle sort: alphabetical -> release -> custom -> alphabetical...
+        if (sort_mode == SortMode::ALPHA) sort_mode = SortMode::RELEASE;
+        else if (sort_mode == SortMode::RELEASE) sort_mode = SortMode::CUSTOM;
+        else sort_mode = SortMode::ALPHA;
+        save_sort_mode(sort_mode);
+        // On sort change reset active to 0 as specified
+        active = 0;
+        rebuild_view();
+        pending_delete = false;
+        needs_redraw = true;    // Mark for redraw
+      } else if (in == ui::Input::Y) {
+        // confirm-delete flow
+        if (!pending_delete) {
+          // begin pending deletion
+          pending_delete = true;
+          pending_since = std::chrono::steady_clock::now();
+          needs_redraw = true;  // Mark for redraw (show overlay)
+        } else {
+          // confirm if within timeout
+          auto now = std::chrono::steady_clock::now();
+          if (now - pending_since <= confirm_timeout) {
+            if (!view.empty()) {
+              // Find this game's index in DB (GameDB stores canonical order)
+              std::string path_to_remove = view[active].path;
+              size_t idx_in_db = game_db.find_by_path(path_to_remove);
+              if (idx_in_db < game_db.games().size()) {
+                bool removed = game_db.remove(idx_in_db);
+                if (!removed) {
+                  std::cerr << "[slider] failed to remove entry from GameDB\n";
                 } else {
-                  Logger::instance().info(std::string("removed: ") + path_to_remove);
+                  if (!game_db.commit()) {
+                    std::cerr << "[slider] failed to commit GameDB after removal\n";
+                  } else {
+                    Logger::instance().info(std::string("removed: ") + path_to_remove);
+                  }
                 }
+                // rebuild view and clamp active
+                rebuild_view();
+                needs_redraw = true;  // Mark for redraw
               }
-              // rebuild view and clamp active
-              rebuild_view();
             }
           }
+          // clear pending state regardless
+          pending_delete = false;
+          needs_redraw = true;  // Mark for redraw (hide overlay)
         }
-        // clear pending state regardless
-        pending_delete = false;
-      }
-    } else if (in == ui::Input::B) {
-      if (pending_delete) {
-        // cancel pending deletion
-        pending_delete = false;
-      } else {
-        // exit
-        running = false;
+      } else if (in == ui::Input::B) {
+        if (pending_delete) {
+          // cancel pending deletion
+          pending_delete = false;
+          needs_redraw = true;  // Mark for redraw (hide overlay)
+        } else {
+          // exit
+          running = false;
+        }
       }
     }
 
@@ -238,41 +293,46 @@ int slider_main(const std::string &config_path,
       auto now = std::chrono::steady_clock::now();
       if (now - pending_since > confirm_timeout) {
         pending_delete = false;
+        needs_redraw = true;  // Mark for redraw (hide overlay)
       }
     }
 
     // Reload config if hot-reloading is enabled
-    menu::MenuConfig::reload_if_enabled();
+    menu::MenuConfig::reload_if_enabled(); // This function returns void
 
-    // Render UI
-    renderer.clear();
-    // Background (if configured)
-    std::string bkg = cfg.get<std::string>("ui.background", std::string("bckg.png"));
-    renderer.draw_background(bkg);
+    // ONLY render if something changed
+    if (needs_redraw) {
+      renderer.clear();
+      
+      // Background (if configured)
+      std::string bkg = cfg.get<std::string>("ui.background", std::string(global::g_exe_dir + "assets/bckg.png"));
+      renderer.draw_background(bkg);
 
-    // Draw carousel: build a small slice to show. We'll pass the three items centered on active.
-    std::vector<Game> slice;
-    if (!view.empty()) {
-      size_t n = view.size();
-      size_t prev = (active + n - 1) % n;
-      size_t next = (active + 1) % n;
-      slice.push_back(view[prev]);
-      slice.push_back(view[active]);
-      slice.push_back(view[next]);
+      // Draw carousel: build a small slice to show. We'll pass the three items centered on active.
+      std::vector<Game> slice;
+      if (!view.empty()) {
+        size_t n = view.size();
+        size_t prev = (active + n - 1) % n;
+        size_t next = (active + 1) % n;
+        slice.push_back(view[prev]);
+        slice.push_back(view[active]);
+        slice.push_back(view[next]);
+      }
+      renderer.draw_game_carousel(slice, slice.empty() ? 0 : 1, &cache);
+
+      // Draw help - using config for positioning
+      renderer.draw_text(6, menu::MenuConfig::SCREEN_HEIGHT() - 40, "A: play   X: sort   Y: remove   B: exit");
+
+      // If pending_delete show overlay
+      if (pending_delete) {
+        renderer.draw_overlay("Press Y again to confirm removal or B to cancel");
+      }
+
+      renderer.present();
+      needs_redraw = false;  // Clear the flag after rendering
     }
-    renderer.draw_game_carousel(slice, slice.empty() ? 0 : 1, &cache);
 
-    // Draw help - using config for positioning
-    renderer.draw_text(6, menu::MenuConfig::SCREEN_HEIGHT() - 40, "A: play   X: sort   Y: remove   B: exit");
-
-    // If pending_delete show overlay
-    if (pending_delete) {
-      renderer.draw_overlay("Press Y again to confirm removal or B to cancel");
-    }
-
-    renderer.present();
-
-    std::this_thread::sleep_for(40ms);
+    std::this_thread::sleep_for(40ms);  // Still sleep to avoid busy-waiting on input
   }
 
   // On exit ensure pending deletion canceled

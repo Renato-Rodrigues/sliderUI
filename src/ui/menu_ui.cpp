@@ -1,4 +1,5 @@
 // src/ui/menu_ui.cpp
+#include "core/global.h"
 #include "ui/renderer.h"
 #include "ui/menu_constants.h"
 #include "ui/games_list.h"
@@ -57,7 +58,7 @@ int menu_main(const std::string &config_path) {
   bool kids_mode_enabled = cfg.get<bool>("behavior.kids_mode_enabled", false);
 
   // Initialize menu config (loads sliderUI_cfg.json)
-  MenuConfig::init("sliderUI_cfg.json");
+  MenuConfig::init(global::g_exe_dir + "cfg/sliderUI_cfg.json");
 
   // renderer
   Renderer renderer;
@@ -124,7 +125,7 @@ int menu_main(const std::string &config_path) {
         } else if (selected == GAMES_LIST) {
           // Load game database
           core::GameDB game_db;
-          std::string games_csv = "gameList.csv";  // TODO: Get from config
+          std::string games_csv = global::g_exe_dir + "gameList.csv";  // TODO: Get from config
           if (!game_db.load(games_csv)) {
             Logger::instance().error("Failed to load games database: " + games_csv);
             renderer.draw_overlay("Error: Could not load games list");

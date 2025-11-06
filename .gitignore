@@ -3,3 +3,6 @@
 dist/
 logs/
 *.tmp
+bin/
+release/
+docs/

@@ -25,6 +25,12 @@ bool file_exists(const std::string &path);
  */
 uint64_t file_mtime(const std::string &path);
 
+/**
+ * Return the directory of the current executable, including trailing '/'.
+ * On error returns "./".
+ */
+std::string get_exe_dir();
+
 } // namespace file_utils
 
 #endif // SLIDERUI_CORE_FILE_UTILS_H

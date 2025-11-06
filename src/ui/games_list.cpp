@@ -1,3 +1,5 @@
+// src/ui/games_list.cpp
+#include "core/global.h"
 #include "ui/games_list.h"
 #include "ui/renderer.h"
 #include "ui/menu_constants.h"
@@ -16,7 +18,7 @@ namespace ui {
 
 bool show_games_list(Renderer& renderer, GameListState& state) {
     // Initialize menu config if not already done
-    MenuConfig::init("sliderUI_cfg.json");
+    MenuConfig::init(global::g_exe_dir + "cfg/sliderUI_cfg.json");
     
     bool running = true;
     bool game_selected = false;
