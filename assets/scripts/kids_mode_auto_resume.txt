@@ -1,0 +1,3 @@
+# kids_mode_auto_resume.txt
+# Launch sliderUI in kids mode. When sliderUI exits via the konami code it should remove this auto_resume file.
+"/mnt/SDCARD/tools/sliderUI/sliderUI.elf" --mode kidsmode --path "/mnt/SDCARD/games" --exit konami
