@@ -107,31 +107,68 @@ sudo apt-get install libsdl1.2-dev libsdl-ttf2.0-dev libsdl-image1.2-dev
 
 #### Building and Running Preview
 ```bash
-# Build desktop preview version
-make BUILD_TYPE=desktop
+# Run the bundle command inside Docker
+docker run --rm \
+  -u "$(id -u):$(id -g)" \
+  -v "$(pwd)":/app \
+  -w /app \
+  union-miyoomini-toolchain:latest \
+  /bin/bash -c "make bundle && make install-wrapper"
 
-# Run the preview
-./bin/sliderUI.elf    # For game browser interface
-./bin/menu.elf        # For menu interface
+# Check the deploy directory was created
+ls -la deploy/
 ```
 
-#### Preview Controls
-- Arrow keys: Navigation
-- J key: A button
-- K key: B button
-- U key: X button
-- I key: Y button
-- M key: Menu button
+### **Step 5: Deploy to SD Card**
+# sliderUI — Miyoo Mini Plus (MinUI) Carousel Launcher
 
-#### Preview Features
-- Real-time UI updates
-- Accurate layout matching MinUI
-- Image scaling and rendering
-- Text rendering with shadows
-- Game carousel visualization
-- Performance monitoring
+sliderUI is a kid-friendly carousel / launcher for the Miyoo Mini Plus running MinUI.
+It provides:
 
-### Building for Linux Production
+* Horizontal carousel with centered box art and orange outline on selected item.
+* Precomputed reflection images (cached) to reduce runtime cost.
+* Lazy loading of box art and icons (configurable).
+* `.dat` XML parsing with checksum-style cache to avoid re-parsing unchanged files.
+* Installer app that runs from MinUI (no terminal required) to install/update/uninstall.
+* Autorun (Kids Mode) with Konami code to exit to the full MinUI.
+* Parental toggle app (accessible only from MinUI) that enables/disables autorun.
+* Self-contained deployment option: `make bundle` copies required `.so` files to `deploy/lib/` and `run_sliderUI.sh` sets `LD_LIBRARY_PATH` to them at runtime.
+* Deploy helper scripts for the union-miyoomini-toolchain Docker image.
+
+---
+
+(README content truncated for brevity in this demo)
+
+## Deploying the SD Card from WSL (Windows Users)
+
+If you're using **WSL2** on Windows, you can mount the SD card inside WSL to run `deploy_to_sd.sh` directly.
+
+### 1. Install usbipd (Windows, Admin PowerShell)
+
+```powershell
+winget install usbipd
+```
+
+(or download from [https://github.com/dorssel/usbipd-win/releases](https://github.com/dorssel/usbipd-win/releases))
+
+### 2. Attach the SD card to WSL
+
+List USB devices:
+
+```powershell
+usbipd wsl list
+```
+
+Bind + attach (replace `<BUSID>`):
+
+```powershell
+usbipd wsl bind --busid <BUSID>
+usbipd wsl attach --busid <BUSID>
+```
+
+Restart your WSL terminal if already open.
+
+### 3. Mount the SD card in WSL
 
 ```bash
 # Build for Linux
