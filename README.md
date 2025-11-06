@@ -1,374 +1,264 @@
-# sliderUI — Miyoo Mini Plus (MinUI) Carousel Launcher
+# SliderUI
 
-sliderUI is a kid-friendly carousel / launcher for the Miyoo Mini Plus running MinUI.
-It provides:
+A user interface application designed for the Miyoo Mini gaming device, providing a smooth and intuitive game selection interface with additional features like kids mode and custom sorting options.
 
-- Horizontal carousel with centered box art and orange outline on selected item.
-- Precomputed reflection images (cached) to reduce runtime cost.
-- Lazy loading of box art and icons (configurable).
-- `.dat` XML parsing with checksum-style cache to avoid re-parsing unchanged files.
-- Installer app that runs from MinUI (no terminal required) to install/update/uninstall.
-- Autorun (Kids Mode) with Konami code to exit to the full MinUI.
-- Parental toggle app (accessible only from MinUI) that enables/disables autorun.
-- Self-contained deployment option: `make bundle` copies required `.so` files to `deploy/lib/` and `run_sliderUI.sh` sets `LD_LIBRARY_PATH` to them at runtime.
-- Deploy helper scripts for the union-miyoomini-toolchain Docker image.
+## 🎮 Features
 
----
+- Smooth sliding UI for game selection
+- Kids mode for restricted game access
+- Configurable UI elements and behaviors
+- CSV-based game list management
+- Image caching for improved performance
+- Custom sorting options
+- Support for both Linux and Miyoo Mini platforms
 
-## Project layout
+## 📁 Project Structure
 
 ```
-
 sliderUI/
-├── Makefile
-├── README.md
-├── build/                          # build artifacts (after compile)
-├── deploy/                         # created by `make bundle` + `make install-wrapper`
-│   ├── lib/                        # bundled .so files (by make bundle)
-│   └── run_sliderUI.sh             # runtime wrapper (by make install-wrapper)
-├── config/
-│   └── sliderUI.cfg
-├── data/
-│   └── sliderUI_games.txt          # example of file located at (/mnt/SDCARD/Roms/sliderUI_games.txt)
-├── assets/
-│   ├── icons/
-│   │   └── SFC.png
-│   └── fonts/
-│       └── default.ttf
-├── src/
-│   ├── main.cpp
-│   ├── slider.hpp
-│   ├── slider.cpp
-│   ├── reflection_cache.hpp
-│   ├── reflection_cache.cpp
-│   ├── dat_cache.h
-│   ├── dat_cache.cpp
-│   └── slider_installer.cpp
-├── tools/
-│   ├── install_sliderUI.sh
-│   ├── launch_sliderUI.sh
-│   └── toggle_mode.sh
-│   └── toggle_sliderUI_autorun.sh
-├── build_in_toolchain.sh
-└── deploy_to_sd.sh
+├── buildAndRun.sh       # Build and run script
+├── gameList.csv         # Sample game list
+├── kidsMode.sh         # Kids mode management script
+├── launch.sh           # Launch script
+├── Makefile            # Build configuration
+├── include/            # Header files
+│   ├── core/          # Core functionality headers
+│   │   ├── config_manager.h
+│   │   ├── csv_parser.h
+│   │   ├── file_utils.h
+│   │   ├── game_db.h
+│   │   ├── image_cache.h
+│   │   ├── image_loader.h
+│   │   ├── logger.h
+│   │   └── sort.h
+│   └── ui/            # UI-related headers
+│       ├── menu_ui.h
+│       └── renderer.h
+├── src/               # Source files
+│   ├── core/         # Core implementation
+│   │   ├── config_manager.cpp
+│   │   ├── csv_parser.cpp
+│   │   ├── file_utils.cpp
+│   │   ├── game_db.cpp
+│   │   ├── image_cache.cpp
+│   │   ├── image_loader.cpp
+│   │   ├── logger.cpp
+│   │   └── sort.cpp
+│   └── ui/          # UI implementation
+│       ├── menu_main.cpp
+│       ├── menu_ui.cpp
+│       ├── slider_main.cpp
+│       └── slider_ui.cpp
+└── test/            # Unit tests
+    ├── test_config_manager.cpp
+    ├── test_csv_parser.cpp
+    ├── test_file_utils.cpp
+    ├── test_game_db.cpp
+    ├── test_image_cache.cpp
+    ├── test_image_loader.cpp
+    ├── test_logger.cpp
+    └── test_sort.cpp
+```
 
-````
+## 🔧 File Descriptions
 
----
+### Core Components
+- `config_manager`: JSON configuration management
+- `csv_parser`: Game list CSV file parsing
+- `file_utils`: File system operations
+- `game_db`: Game database management
+- `image_cache`: Image caching system
+- `image_loader`: Image loading and processing
+- `logger`: Logging system
+- `sort`: Game list sorting algorithms
 
-## Quick summary of important runtime paths (on device)
+### UI Components
+- `menu_ui`: Menu interface implementation
+- `renderer`: Graphics rendering system
+- `slider_ui`: Main sliding interface implementation
+- `menu_main`, `slider_main`: Entry points for the applications
 
-- Games list (user-provided): `/mnt/SDCARD/Roms/sliderUI_games.txt`
-- Game ROM: `/mnt/SDCARD/Roms/<systemFolder>/<gameFile>`
-- Box art: `/mnt/SDCARD/Roms/<systemFolder>/.res/<gameBasename>.png`
-- System `.dat` XML: `/mnt/SDCARD/Roms/<systemFolder>/<systemName>.dat`
-- Installed app directory: `/mnt/SDCARD/App/sliderUI/`
-- Installer app directory: `/mnt/SDCARD/App/sliderUI_installer/`
-- Reflection cache (app): `/mnt/SDCARD/App/sliderUI/cache/reflections/`
-- Dat cache (app): `/mnt/SDCARD/App/sliderUI/dat_cache.txt`
-- Bundled libs (if used): `/mnt/SDCARD/App/sliderUI/lib/`
-- Runtime launcher wrapper: `/mnt/SDCARD/App/sliderUI/run_sliderUI.sh`
+## 🚀 Building and Running
 
----
+### Prerequisites
 
-## Build & deploy (step-by-step)
+#### For Linux/WSL:
+- g++ (with C++17 support)
+- make
+- bash
+- dos2unix (recommended)
+- ssh (optional)
+- docker (optional, for Miyoo Mini toolchain)
 
-### **Prerequisites**
+#### For Miyoo Mini:
+- MinUI environment
+- union-miyoomini-toolchain
 
-1. **Windows with WSL2 (Ubuntu/Debian)**
-2. **Docker Desktop** installed and running
-3. **Basic tools in WSL:**
-   ```bash
-   sudo apt update
-   sudo apt install -y git curl build-essential
-   ```
+### Development Preview Mode
 
-### **Step 1: Setup Toolchain (One-Time)**
+For UI development and testing, a preview mode using SDL 1.2 is available in Linux/WSL:
+
+#### Prerequisites
+```bash
+# Install SDL 1.2 and dependencies
+sudo apt-get update
+sudo apt-get install libsdl1.2-dev libsdl-ttf2.0-dev libsdl-image1.2-dev
+```
+
+#### Building and Running Preview
+```bash
+# Build desktop preview version
+make BUILD_TYPE=desktop
+
+# Run the preview
+./bin/sliderUI.elf    # For game browser interface
+./bin/menu.elf        # For menu interface
+```
+
+#### Preview Controls
+- Arrow keys: Navigation
+- J key: A button
+- K key: B button
+- U key: X button
+- I key: Y button
+- M key: Menu button
+
+#### Preview Features
+- Real-time UI updates
+- Accurate layout matching MinUI
+- Image scaling and rendering
+- Text rendering with shadows
+- Game carousel visualization
+- Performance monitoring
+
+### Building for Linux Production
 
 ```bash
-# Navigate to your home directory
-cd ~
+# Build for Linux
+make linux
 
-# Clone the toolchain
+# Run the application
+./buildAndRun.sh
+```
+
+### Building for Miyoo Mini
+
+1. Set up the union-miyoomini-toolchain:
+```bash
 git clone https://github.com/shauninman/union-miyoomini-toolchain.git
 cd union-miyoomini-toolchain
-
-# if this PR is not merged yet, do the changes you can find here: https://github.com/shauninman/union-miyoomini-toolchain/pull/3/files
-
-# Build the Docker image (this takes 10-30 minutes)
-docker build -t union-miyoomini-toolchain:latest .
-
-# Verify the image was created
-docker images | grep union
+make shell
 ```
 
-**Expected output:**
-```
-union-miyoomini-toolchain   latest   abc123def456   500MB
+2. Inside the toolchain container:
+```bash
+cd /workspace/sliderUI
+make myioo
 ```
 
-### **Step 2: Get Your sliderUI Project**
+### Deploying to Miyoo Mini
+
+1. Create the target directory on your SD card:
+```bash
+SDROOT="/path/to/sd"
+mkdir -p "$SDROOT/tools/sliderUI"
+```
+
+2. Copy the required files:
+```bash
+cp menu.elf sliderUI.elf "$SDROOT/tools/sliderUI/"
+cp sliderUI_cfg.json gameList.csv "$SDROOT/tools/sliderUI/"
+cp tools/kidsMode.sh tools/launch.sh "$SDROOT/tools/sliderUI/"
+```
+
+3. On the device:
+```bash
+cd /mnt/SDCARD/tools/sliderUI
+chmod +x menu.elf sliderUI.elf
+./menu.elf
+```
+
+## 🧪 Testing
+
+The project includes comprehensive unit tests for all core components. To run the tests:
 
 ```bash
-# Still in ~/ or wherever you want your project
-cd ~
-
-# Clone your sliderUI repository
-git clone https://github.com/Renato-Rodrigues/sliderUI.git
-cd sliderUI
-
-# Make scripts executable
-chmod +x full_build.sh
-chmod +x build_in_toolchain.sh
-chmod +x deploy_to_sd.sh
+make test
+./test_runner
 ```
 
-### **Step 3: Build the Project**
+## ⚙️ Configuration
 
-```bash
-# Run complete build
-./full_build.sh
+The application can be configured through `sliderUI_cfg.json`. Key configuration options include:
+
+### UI Configuration
+```json
+{
+  "ui": {
+    "resolution": [640, 480],
+    "background": "bckg.png",
+    "title": {
+      "x": 20,
+      "y": 40,
+      "size": 28,
+      "font": "default",
+      "color": "#FFFFFF",
+      "align": "left"
+    },
+    "game_image": {
+      "x": 200,
+      "y": 160,
+      "width": 280,
+      "height": 200,
+      "margin": 40,
+      "scale": "fit",
+      "side_scale": 0.8
+    }
+  }
+}
 ```
 
-### **Step 4: Bundle Libraries (Optional but Recommended)**
+### Key Configuration Areas:
+- UI appearance and positioning
+- Text styling and colors
+- Image scaling and placement
+- Kids mode settings
+- Image cache settings
+- Sorting preferences
+- Input handling
+- Logging options
 
-```bash
-# Run the bundle command inside Docker
-docker run --rm \
-  -u "$(id -u):$(id -g)" \
-  -v "$(pwd)":/app \
-  -w /app \
-  union-miyoomini-toolchain:latest \
-  /bin/bash -c "make bundle && make install-wrapper"
+Configuration changes take effect immediately in preview mode, allowing for rapid UI iteration.
 
-# Check the deploy directory was created
-ls -la deploy/
+## 📋 Game List Format
+
+Games are listed in `gameList.csv` with the following format:
+```csv
+path;order in custom sort mode;title,release date
+/path/to/game.gba,0,Game Name,YYYY-MM-DD
 ```
+- If Game name does not exist, the menu will use the game filename
+- The release date accepts either YYYY-MM-DD, YYYY-MM or YYYY formats
 
-### **Step 5: Deploy to SD Card**
-# sliderUI — Miyoo Mini Plus (MinUI) Carousel Launcher
+## 🚨 Troubleshooting
 
-sliderUI is a kid-friendly carousel / launcher for the Miyoo Mini Plus running MinUI.
-It provides:
+- **Clock skew issues on WSL**: Use `sudo ntpdate -u time.google.com` or `wsl --shutdown`
+- **Script errors**: Ensure Unix line endings with `dos2unix`
+- **Execution permissions**: Use `chmod +x` on executables after copying to SD card
+- **Binary compatibility**: Ensure you're using the correct build for your platform (Linux vs MIPS)
 
-* Horizontal carousel with centered box art and orange outline on selected item.
-* Precomputed reflection images (cached) to reduce runtime cost.
-* Lazy loading of box art and icons (configurable).
-* `.dat` XML parsing with checksum-style cache to avoid re-parsing unchanged files.
-* Installer app that runs from MinUI (no terminal required) to install/update/uninstall.
-* Autorun (Kids Mode) with Konami code to exit to the full MinUI.
-* Parental toggle app (accessible only from MinUI) that enables/disables autorun.
-* Self-contained deployment option: `make bundle` copies required `.so` files to `deploy/lib/` and `run_sliderUI.sh` sets `LD_LIBRARY_PATH` to them at runtime.
-* Deploy helper scripts for the union-miyoomini-toolchain Docker image.
+## 🤝 Contributing
 
----
+Contributions are welcome! Please ensure:
+1. Code follows the existing style
+2. All tests pass
+3. New features include appropriate tests
+4. Documentation is updated as needed
 
-(README content truncated for brevity in this demo)
+## 📄 License
 
-## Deploying the SD Card from WSL (Windows Users)
+[Include license information here]
 
-If you're using **WSL2** on Windows, you can mount the SD card inside WSL to run `deploy_to_sd.sh` directly.
+## 📞 Support
 
-### 1. Install usbipd (Windows, Admin PowerShell)
-
-```powershell
-winget install usbipd
-```
-
-(or download from [https://github.com/dorssel/usbipd-win/releases](https://github.com/dorssel/usbipd-win/releases))
-
-### 2. Attach the SD card to WSL
-
-List USB devices:
-
-```powershell
-usbipd wsl list
-```
-
-Bind + attach (replace `<BUSID>`):
-
-```powershell
-usbipd wsl bind --busid <BUSID>
-usbipd wsl attach --busid <BUSID>
-```
-
-Restart your WSL terminal if already open.
-
-### 3. Mount the SD card in WSL
-
-```bash
-lsblk               # find device, e.g. /dev/sdb1
-sudo mkdir -p /mnt/sdcard
-sudo mount /dev/sdb1 /mnt/sdcard
-```
-
-### 4. Deploy
-
-```bash
-sudo ./deploy_to_sd.sh /mnt/sdcard
-```
-
-### 5. Safely Unmount
-
-```bash
-sudo sync
-sudo umount /mnt/sdcard
-```
-
-Detach from Windows:
-
-```powershell
-usbipd wsl detach --busid <BUSID>
-```
-
-Done — now remove the SD card normally.
-
----
-
-## **Verify Your Build**
-
-After building, check that you have:
-
-```bash
-ls -lh build/
-```
-
-Should show:
-- `sliderUI` (~200-300KB)
-- `sliderUI_installer` (~150-200KB)
-- `*.sha256` files
-
-```bash
-file build/sliderUI
-```
-
-Should show:
-```
-build/sliderUI: ELF 32-bit LSB executable, ARM, EABI5 version 1 (SYSV), dynamically linked...
-```
----
-
-
----
-
-## **Troubleshooting SDL 1.2 Build Issues**
-
-### **Issue: "SDL.h not found"**
-
-The toolchain might not have SDL 1.2 development headers. Check inside the Docker container:
-
-```bash
-docker run --rm -it union-miyoomini-toolchain:latest /bin/bash
-
-# Inside container:
-ls /opt/union_toolchain/sysroot/usr/include/ | grep -i sdl
-ls /opt/union_toolchain/sysroot/usr/lib/arm-linux-gnueabihf/ | grep -i sdl
-```
-
-**Expected files:**
-```
-/usr/include/SDL/
-/usr/lib/arm-linux-gnueabihf/libSDL-1.2.so
-/usr/lib/arm-linux-gnueabihf/libSDL_image-1.2.so
-/usr/lib/arm-linux-gnueabihf/libSDL_ttf-2.0.so
-```
-
-If these are missing, you need to update the toolchain Dockerfile to include SDL 1.2 development packages.
-
-### **Issue: Linking errors for SDL functions**
-
-Add `-lpthread` to LDFLAGS in Makefile (already included above).
-
-### **Issue: "undefined reference to pthread_create"**
-
-The order matters in linking. Update Makefile LDFLAGS:
-
-```makefile
-LDFLAGS = -L$(SYSROOT)/usr/lib/arm-linux-gnueabihf \
-	-lSDL -lSDL_image -lSDL_ttf -lstdc++fs -lpthread -lm
-```
-
----
-
-## **Final Verification Checklist**
-
-Before deploying to device:
-
-- [ ] Build completes without errors
-- [ ] `build/sliderUI` and `build/sliderUI_installer` exist
-- [ ] Binary size is reasonable (~200-400KB each)
-- [ ] `readelf` shows SDL 1.2 dependencies (not SDL2)
-- [ ] `file` command shows ARM 32-bit ELF
-- [ ] `deploy/` directory contains bundled libraries (optional)
-- [ ] `deploy/run_sliderUI.sh` exists (if bundled)
-
-Check binary architecture:
-
-```bash
-file build/sliderUI
-```
-
-**Expected:**
-```
-build/sliderUI: ELF 32-bit LSB executable, ARM, EABI5 version 1 (SYSV), dynamically linked, interpreter /lib/ld-linux-armhf.so.3, for GNU/Linux 3.2.0, not stripped
-```
-
----
-
-## **Testing on Device**
-
-1. **Insert SD card into Miyoo Mini Plus**
-2. **Power on and navigate to Apps**
-3. **You should see:**
-   - `SliderUI Installer` app
-4. **Run installer and select "Install / Update SliderUI"**
-5. **After install, you should see:**
-   - a new app entry `Slider Mode` app
-6. To enable auto-boot (Kids Mode), use the installer button or the `Enable Auto-boot` option.
-7. From inside sliderUI, enter the Konami code `↑ ↑ ↓ ↓ ← → ← → B A` to return to full MinUI.
-8. To toggle autorun (parental control) from MinUI only, run the `Toggle Kids Mode` app installed by the installer (not available inside sliderUI).
-
----
-
-## **Common Runtime Issues**
-
-### **Black screen on launch**
-
-- Check that fonts exist at `/mnt/SDCARD/App/sliderUI/assets/fonts/default.ttf`
-- Check logs if MinUI provides them
-- Verify screen resolution is 640x480
-
-### **No games showing**
-
-- Check `/mnt/SDCARD/Roms/sliderUI_games.txt` exists
-- Verify format: `SystemFolder (CODE);GameFileName.ext`
-- Example: `SNES (SFC);Super Mario World.sfc`
-
-### **Missing box art**
-
-- Box art should be at: `/mnt/SDCARD/Roms/SYSTEMFOLDER/.res/GAMENAME.png`
-- The `.res` folder is hidden - make sure it exists
-
-### **Joystick not working**
-
-- SDL 1.2 joystick support on Miyoo Mini Plus should work automatically
-- Buttons: A=0, B=1, X=2, Y=3
-- D-pad uses hat events
-
----
-
-### Required Third-Party Header
-
-`stb_image_write.h` is required by `reflection_cache.cpp` for PNG writing:
-```bash
-# Download into src/ directory before building
-cd src/
-wget https://raw.githubusercontent.com/nothings/stb/master/stb_image_write.h
-```
-Alternatively, download manually from: https://github.com/nothings/stb/blob/master/stb_image_write.h
-
----
-
-## License
-
-MIT — modify as you need.
+[Include support information here]
